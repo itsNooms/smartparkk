@@ -4,8 +4,8 @@ self.addEventListener('push', function (event) {
 
         const options = {
             body: payload.body,
-            icon: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png',
-            badge: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png',
+            icon: '/logo.png',
+            badge: '/logo.png',
             vibrate: [200, 100, 200, 100, 200, 100, 200],
             data: payload.data || {},
             actions: payload.actions || []
