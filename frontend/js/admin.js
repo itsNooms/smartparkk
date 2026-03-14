@@ -256,24 +256,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dashboardInitialized) return;
         dashboardInitialized = true;
 
-        // Load saved total parking or default to 50
-        const savedTotal = localStorage.getItem('smartpark_total_parking');
-        if (savedTotal) {
-            document.getElementById('total-parking-display').textContent = savedTotal;
-            document.getElementById('total-parking-input').value = savedTotal;
-        }
-
-        const savedRate = localStorage.getItem('smartpark_rate_per_hour');
-        if (savedRate) {
-            document.getElementById('rate-parking-display').textContent = savedRate;
-            document.getElementById('rate-parking-input').value = savedRate;
-        }
-
-        const savedFine = localStorage.getItem('smartpark_fine_amount');
-        if (savedFine) {
-            document.getElementById('fine-amount-display').textContent = savedFine;
-            document.getElementById('fine-amount-input').value = savedFine;
-        }
+        // Load saved settings from backend (sync across devices)
+        fetch('/api/settings')
+            .then(res => res.json())
+            .then(settings => {
+                settings.forEach(s => {
+                    if (s.key === 'smartpark_total_parking') {
+                        document.getElementById('total-parking-display').textContent = s.value;
+                        document.getElementById('total-parking-input').value = s.value;
+                        localStorage.setItem('smartpark_total_parking', s.value);
+                    }
+                    if (s.key === 'smartpark_rate_per_hour') {
+                        document.getElementById('rate-parking-display').textContent = s.value;
+                        document.getElementById('rate-parking-input').value = s.value;
+                        localStorage.setItem('smartpark_rate_per_hour', s.value);
+                    }
+                    if (s.key === 'smartpark_fine_amount') {
+                        document.getElementById('fine-amount-display').textContent = s.value;
+                        document.getElementById('fine-amount-input').value = s.value;
+                        localStorage.setItem('smartpark_fine_amount', s.value);
+                    }
+                });
+                updateParkingStats();
+            })
+            .catch(err => console.error('[SETTINGS] Load error:', err));
 
         loadTableData();
         loadResidentsData();
@@ -409,6 +415,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (val && val > 0) {
                 totalDisplay.textContent = val;
                 localStorage.setItem('smartpark_total_parking', val);
+                // Save to backend
+                fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: 'smartpark_total_parking', value: val.toString() })
+                }).catch(err => console.error('[SETTINGS] Save error:', err));
             }
             totalDisplay.style.display = 'inline';
             totalInput.style.display = 'none';
@@ -455,6 +467,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (val >= 0) {
                 rateDisplay.textContent = val;
                 localStorage.setItem('smartpark_rate_per_hour', val);
+                // Save to backend
+                fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: 'smartpark_rate_per_hour', value: val.toString() })
+                }).catch(err => console.error('[SETTINGS] Save error:', err));
             }
             rateDisplay.style.display = 'inline';
             rateInput.style.display = 'none';
@@ -500,6 +518,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (val >= 0) {
                 fineDisplay.textContent = val;
                 localStorage.setItem('smartpark_fine_amount', val);
+                // Save to backend
+                fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: 'smartpark_fine_amount', value: val.toString() })
+                }).catch(err => console.error('[SETTINGS] Save error:', err));
             }
             fineDisplay.style.display = 'inline';
             fineInput.style.display = 'none';

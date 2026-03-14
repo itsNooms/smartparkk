@@ -71,6 +71,47 @@ app.get('/admin', (req, res) => res.sendFile(path.join(FRONTEND_DIR, 'admin.html
 app.get('/resident', (req, res) => res.sendFile(path.join(FRONTEND_DIR, 'resident.html')));
 
 // ============================================
+// SETTINGS API (SUPABASE)
+// ============================================
+
+// Get all settings
+app.get('/api/settings', async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('settings').select('*');
+        if (error) {
+            // Table might not exist yet, return empty array (defaults will be used)
+            console.warn('[SETTINGS] Fetch error (likely table missing):', error.message);
+            return res.json([]);
+        }
+        res.json(data || []);
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Update or create a setting
+app.post('/api/settings', async (req, res) => {
+    const { key, value } = req.body;
+    if (!key) return res.status(400).json({ success: false, message: 'key is required' });
+
+    try {
+        // Upsert setting
+        const { data, error } = await supabase
+            .from('settings')
+            .upsert([{ key, value, updated_at: new Date().toISOString() }], { onConflict: 'key' })
+            .select();
+
+        if (error) {
+            console.error('[SETTINGS] Update error:', error.message);
+            return res.status(500).json({ success: false, message: error.message });
+        }
+        res.json({ success: true, setting: data[0] });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ============================================
 // WHATSAPP OTP
 // ============================================
 const otpStore = {};  // phone -> { otp, expiresAt }

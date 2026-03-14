@@ -14,6 +14,33 @@ let visitorData = {
 };
 
 // =============================================
+// GLOBAL SETTINGS SYNC (from Backend)
+// =============================================
+async function syncSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        const settings = await res.json();
+        settings.forEach(s => {
+            if (s.key === 'smartpark_total_parking') {
+                localStorage.setItem('smartpark_total_parking', s.value);
+            }
+            if (s.key === 'smartpark_rate_per_hour') {
+                localStorage.setItem('smartpark_rate_per_hour', s.value);
+                visitorData.ratePerHour = parseFloat(s.value);
+                const rateEl = document.getElementById('active-rate-display');
+                if (rateEl) rateEl.textContent = '₹' + visitorData.ratePerHour.toFixed(2) + ' / hour';
+            }
+            if (s.key === 'smartpark_fine_amount') {
+                localStorage.setItem('smartpark_fine_amount', s.value);
+            }
+        });
+    } catch (e) { console.warn('[SETTINGS] Sync failed:', e); }
+}
+
+// Sync once on load
+syncSettings();
+
+// =============================================
 // LIVE SPOTS AVAILABLE BANNER
 // =============================================
 let lastSpotCount = null;
@@ -31,11 +58,17 @@ async function fetchAndUpdateSpots() {
             return (now - new Date(v.entryTime).getTime()) <= ONE_DAY;
         }).length;
 
-        // Read total capacity from localStorage (admin sets this; default 50)
-        const total = parseInt(localStorage.getItem('smartpark_total_parking') || '50');
-        const available = Math.max(total - occupied, 0);
+        // Sync settings first to get latest total
+        await syncSettings();
 
-        updateSpotsBanner(available, total);
+        // Read total capacity (now updated from syncSettings; fallback to 50)
+        const total = parseInt(localStorage.getItem('smartpark_total_parking') || '50');
+
+        // Per User Request: Show ONLY the value entered in admin (Total Capacity) 
+        // on the visitor banner instead of the calculated available count.
+        const valueToShow = total;
+
+        updateSpotsBanner(valueToShow, total);
     } catch (e) {
         // Server unreachable — keep showing last value or hide
         const banner = document.getElementById('spots-banner');
