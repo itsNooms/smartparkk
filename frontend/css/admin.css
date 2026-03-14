@@ -1,0 +1,631 @@
+:root {
+    --bg-dark: #0f172a;
+    --sidebar-bg: #1e293b;
+    --card-bg: rgba(30, 41, 59, 0.7);
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --secondary: #475569;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --highlight: #38bdf8;
+    --success: #10b981;
+    --danger: #ef4444;
+    --border: rgba(255, 255, 255, 0.1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+}
+
+.dashboard {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 220px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 30px 24px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-main);
+    border-bottom: 1px solid var(--border);
+}
+
+.nav-links {
+    display: flex;
+    flex-direction: column;
+    padding: 24px 16px;
+    gap: 8px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.nav-item:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-item.active {
+    color: var(--primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 32px;
+    overflow-y: auto;
+    background: radial-gradient(circle at top right, #1e293b, #0f172a 60%);
+}
+
+.top-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 40px;
+}
+
+.top-nav h1 {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+}
+
+.subtitle {
+    color: var(--text-muted);
+    font-size: 15px;
+}
+
+.stat-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.active-dot {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
+.table-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    backdrop-filter: blur(12px);
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.data-table th {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 16px 16px;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+}
+
+.data-table td {
+    padding: 16px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--text-main);
+    white-space: nowrap;
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.status-badge {
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-active {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-completed {
+    background: rgba(71, 85, 105, 0.3);
+    color: var(--text-muted);
+    border: 1px solid rgba(71, 85, 105, 0.4);
+}
+
+.empty-state {
+    padding: 40px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.empty-state.hidden {
+    display: none;
+}
+
+.money {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.plate {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-weight: bold;
+    color: var(--highlight);
+}
+
+/* Stats Row */
+.stats-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 28px;
+}
+
+.stat-card {
+    flex: 1;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    backdrop-filter: blur(12px);
+}
+
+.stat-label {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.stat-available .stat-value {
+    color: var(--success);
+}
+
+.stat-occupied .stat-value {
+    color: var(--highlight);
+}
+
+.stat-edit-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-edit-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.stat-edit-input {
+    width: 80px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--text-main);
+    font-size: 24px;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+}
+
+.editable-stat {
+    cursor: pointer;
+}
+
+/* =============================================
+   PARKING LOT VIEW
+   ============================================= */
+
+.pl-legend {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.pl-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.pl-legend-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.pl-dot-available {
+    background: var(--success);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.pl-dot-occupied {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+/* Wrapper scrollable */
+.pl-wrapper {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    backdrop-filter: blur(12px);
+    padding: 28px 32px;
+    overflow-x: auto;
+}
+
+/* Road / Entrance banner */
+.pl-road {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+    padding: 12px 20px;
+}
+
+.pl-road-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--highlight);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.pl-road-dashes {
+    flex: 1;
+    border-top: 2px dashed rgba(56, 189, 248, 0.25);
+    border-radius: 2px;
+}
+
+/* Section / Row label */
+.pl-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    padding-left: 4px;
+    text-transform: uppercase;
+}
+
+/* Grid of spots */
+.pl-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+    min-height: 90px;
+}
+
+/* Drive lane aisle */
+.pl-aisle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    margin: 10px 0;
+    border-top: 1.5px dashed rgba(255, 255, 255, 0.08);
+    border-bottom: 1.5px dashed rgba(255, 255, 255, 0.08);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.15);
+    text-transform: uppercase;
+}
+
+/* Individual parking spot */
+.pl-spot {
+    position: relative;
+    width: 88px;
+    height: 76px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: default;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    border: 2px solid transparent;
+    overflow: visible;
+}
+
+.pl-spot:hover {
+    transform: translateY(-3px);
+    z-index: 10;
+}
+
+/* Spot number badge */
+.pl-spot-num {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    opacity: 0.7;
+}
+
+/* Car icon inside spot */
+.pl-spot-icon {
+    font-size: 22px;
+    line-height: 1;
+}
+
+/* License plate text */
+.pl-spot-plate {
+    font-family: monospace;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+    max-width: 84px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+}
+
+/* AVAILABLE state */
+.pl-spot.available {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.pl-spot.available:hover {
+    background: rgba(16, 185, 129, 0.14);
+    border-color: rgba(16, 185, 129, 0.55);
+    box-shadow: 0 6px 24px rgba(16, 185, 129, 0.2);
+}
+
+.pl-spot.available .pl-spot-num {
+    color: var(--success);
+}
+
+.pl-spot.available .pl-spot-icon {
+    opacity: 0.18;
+    filter: grayscale(1);
+}
+
+/* OCCUPIED state */
+.pl-spot.occupied {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.35);
+    animation: pl-pulse 3s ease-in-out infinite;
+}
+
+.pl-spot.occupied:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.7);
+    box-shadow: 0 6px 28px rgba(239, 68, 68, 0.25);
+    animation: none;
+}
+
+.pl-spot.occupied .pl-spot-num {
+    color: #ef4444;
+}
+
+.pl-spot.occupied .pl-spot-icon {
+    opacity: 1;
+    filter: none;
+}
+
+.pl-spot.occupied .pl-spot-plate {
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--highlight);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+@keyframes pl-pulse {
+
+    0%,
+    100% {
+        border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    50% {
+        border-color: rgba(239, 68, 68, 0.65);
+    }
+}
+
+/* Tooltip on hover */
+.pl-spot .pl-tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--text-main);
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+}
+
+.pl-spot .pl-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--border);
+}
+
+.pl-spot:hover .pl-tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+.pl-tooltip-name {
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 2px;
+}
+
+.pl-tooltip-detail {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+/* ── WHEELCHAIR / ACCESSIBLE spots ── */
+.pl-spot.wheelchair.available {
+    background: rgba(56, 189, 248, 0.08);
+    border-color: rgba(56, 189, 248, 0.35);
+    animation: wheelchair-pulse 3s ease-in-out infinite;
+}
+
+.pl-spot.wheelchair.available:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: rgba(56, 189, 248, 0.65);
+    box-shadow: 0 6px 24px rgba(56, 189, 248, 0.25);
+    animation: none;
+}
+
+.pl-spot.wheelchair.available .pl-spot-num {
+    color: #38bdf8;
+}
+
+.pl-spot.wheelchair.available .pl-spot-icon {
+    opacity: 0.75;
+    filter: none;
+}
+
+.pl-spot.wheelchair.occupied {
+    background: rgba(56, 189, 248, 0.12);
+    border-color: rgba(56, 189, 248, 0.5);
+}
+
+.pl-spot.wheelchair.occupied .pl-spot-num {
+    color: #38bdf8;
+}
+
+.pl-spot.wheelchair.occupied .pl-spot-icon {
+    opacity: 1;
+    filter: none;
+}
+
+.pl-spot.wheelchair.occupied .pl-spot-plate {
+    background: rgba(0, 0, 0, 0.5);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+@keyframes wheelchair-pulse {
+
+    0%,
+    100% {
+        border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    50% {
+        border-color: rgba(56, 189, 248, 0.65);
+        box-shadow: 0 0 14px rgba(56, 189, 248, 0.2);
+    }
+}
+
+/* Wheelchair legend dot (for the key) */
+.pl-dot-wheelchair {
+    background: #38bdf8;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}

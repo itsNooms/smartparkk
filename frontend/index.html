@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartParkk - Community Gate Access</title>
+    <meta name="description" content="Community gate parking access and payment system.">
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div id="app" class="app-container">
+        <!-- Top Utility Bar: spots pill + action buttons -->
+        <div class="top-bar" id="top-bar">
+            <!-- Available spots pill -->
+            <div class="spots-banner" id="spots-banner">
+                <div class="spots-banner-inner">
+                    <span class="spots-dot"></span>
+                    <span id="spots-count" class="spots-count">—</span>
+                    <span class="spots-label">spots available</span>
+                </div>
+            </div>
+
+            <!-- Icon Buttons -->
+            <div class="top-bar-actions">
+                <!-- Normal Parking Spots -->
+                <button class="icon-btn" id="btn-normal-spots" title="Normal Parking Spots"
+                    onclick="showParkingModal('normal')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                    </svg>
+                    <span class="icon-btn-label">Normal</span>
+                </button>
+
+                <!-- Accessibility / Wheelchair Physically Challenged Spots -->
+                <button class="icon-btn" id="btn-accessibility" title="Physically Challenged Parking Spots"
+                    onclick="showParkingModal('disabled')">
+                    <span style="font-size: 18px; line-height: 1;">♿</span>
+                    <span class="icon-btn-label">Access</span>
+                </button>
+            </div>
+        </div>
+
+
+        <!-- Screen 1: Registration Form -->
+        <section id="screen-register" class="screen active">
+            <div class="card">
+                <div class="header">
+                    <h1>Welcome to <span class="highlight">SmartParkk</span></h1>
+                    <p>Register your vehicle for community entry</p>
+                </div>
+                <form id="register-form">
+                    <div class="input-group">
+                        <label for="name">Full Name</label>
+                        <input type="text" id="name" required placeholder="John Doe">
+                    </div>
+                    <div class="input-group">
+                        <label for="visiting-flat">Visiting Flat ID</label>
+                        <input type="text" id="visiting-flat" required placeholder="e.g. F-101"
+                            style="text-transform: uppercase;">
+                    </div>
+                    <div class="input-group">
+                        <label for="phone">Phone Number</label>
+                        <input type="tel" id="phone" required placeholder="Enter 10 digit number">
+                    </div>
+                    <div class="input-group">
+                        <label for="license-plate">License Plate</label>
+                        <input type="text" id="license-plate" required placeholder="e.g. MH 12 AB 1234"
+                            style="text-transform: uppercase;">
+                    </div>
+
+                    <!-- Duration Picker -->
+                    <div class="input-group">
+                        <label>Estimated Stay Duration</label>
+                        <div class="duration-chips">
+                            <button type="button" class="chip" data-hours="1">1 hr</button>
+                            <button type="button" class="chip" data-hours="2">2 hrs</button>
+                            <button type="button" class="chip" data-hours="3">3 hrs</button>
+                            <button type="button" class="chip active" data-hours="4">4 hrs</button>
+                            <button type="button" class="chip" data-hours="custom">Custom</button>
+                        </div>
+                        <div class="custom-duration-wrap" id="custom-duration-wrap" style="display:none; gap: 12px;">
+                            <div style="flex:1; display:flex; align-items:center; gap: 6px;">
+                                <input type="number" id="custom-hours" min="0" max="24" placeholder="0"
+                                    class="custom-duration-input" style="width:100%; text-align:center;">
+                                <span style="font-size:14px; color:var(--text-muted); font-weight:600;">hr</span>
+                            </div>
+                            <div style="flex:1; display:flex; align-items:center; gap: 6px;">
+                                <input type="number" id="custom-mins" min="0" max="59" step="5" placeholder="0"
+                                    class="custom-duration-input" style="width:100%; text-align:center;">
+                                <span style="font-size:14px; color:var(--text-muted); font-weight:600;">min</span>
+                            </div>
+                        </div>
+                        <div class="duration-estimate" id="duration-estimate">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            Estimated charge: <strong id="est-charge">&#8377;20.00</strong>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Generate OTP</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Screen 2: OTP Verification -->
+        <section id="screen-otp" class="screen">
+            <div class="card">
+                <div class="header">
+                    <h1>Verify <span class="highlight">OTP</span></h1>
+                    <p>Enter the 4-digit code sent to <span id="display-phone"></span></p>
+                    <p class="mock-note" style="display: none;"></p>
+                </div>
+                <form id="otp-form">
+                    <div class="otp-inputs">
+                        <input type="text" maxlength="1" class="otp-input" required>
+                        <input type="text" maxlength="1" class="otp-input" required>
+                        <input type="text" maxlength="1" class="otp-input" required>
+                        <input type="text" maxlength="1" class="otp-input" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Verify & Enter</button>
+                    <button type="button" class="btn btn-text"
+                        onclick="goBack('screen-otp', 'screen-register')">Back</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Screen 2B: Waiting for Resident Approval -->
+        <section id="screen-waiting" class="screen">
+            <div class="card" style="text-align: center;">
+                <div class="header">
+                    <h1>Waiting for <span class="highlight">Approval</span></h1>
+                    <p>Your request has been sent to the resident at <strong id="waiting-flat-display"></strong></p>
+                </div>
+                <div style="margin: 30px 0;">
+                    <div class="spinner"
+                        style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--highlight); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;">
+                    </div>
+                    <p style="margin-top: 15px; color: var(--text-muted); font-size: 14px;" id="waiting-status-msg">
+                        Waiting for resident to respond...</p>
+                </div>
+                <button type="button" class="btn btn-text" onclick="cancelWaiting()">Cancel Request</button>
+            </div>
+        </section>
+
+        <!-- Screen 2C: Access Denied -->
+        <section id="screen-denied" class="screen">
+            <div class="card" style="text-align: center;">
+                <div
+                    style="width: 60px; height: 60px; border-radius: 50%; background: rgba(239,68,68,0.15); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="3"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </div>
+                <div class="header">
+                    <h1>Access <span style="color: #ef4444;">Denied</span></h1>
+                    <p>The resident has declined your visit request.</p>
+                </div>
+                <button type="button" class="btn btn-primary" style="margin-top: 20px;" onclick="resetApp()">Back to
+                    Home</button>
+            </div>
+        </section>
+
+        <!-- Screen 3: Camera Scan / Entry Validation -->
+        <section id="screen-entry-scan" class="screen">
+            <div class="card">
+                <div class="header">
+                    <h1>Access <span class="highlight">Granted</span></h1>
+                    <p>Proceed to the gate. Security camera is scanning your plate...</p>
+                </div>
+                <div class="camera-container">
+                    <div class="scanner-line"></div>
+                    <video id="entry-camera" autoplay playsinline muted class="camera-feed"></video>
+                    <div class="plate-overlay" id="detected-plate-entry">Scanning...</div>
+                </div>
+                <div class="status-msg" id="entry-status">Initializing scanner, please wait...</div>
+            </div>
+        </section>
+
+        <!-- Screen 3B: Waiting for Admin to Open Gate -->
+        <section id="screen-admin-wait" class="screen">
+            <div class="card" style="text-align: center;">
+                <div
+                    style="width: 60px; height: 60px; border-radius: 50%; background: rgba(16,185,129,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <span style="font-size: 32px;">🔓</span>
+                </div>
+                <div class="header">
+                    <h1>Plate <span class="highlight">Matched</span></h1>
+                    <p>Sending access request to security admin...</p>
+                </div>
+                <div style="margin: 30px 0;">
+                    <div class="spinner"
+                        style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--highlight); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;">
+                    </div>
+                    <p style="margin-top: 15px; color: var(--text-muted); font-size: 14px;">
+                        Waiting for admin to open the gate...
+                    </p>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+                    The gate will open automatically once the admin confirms your entry.
+                </p>
+            </div>
+        </section>
+
+        <!-- Screen 4: Active Parking -->
+        <section id="screen-active" class="screen">
+            <div class="card">
+                <div class="header">
+                    <h1>Parking <span class="highlight">Active</span></h1>
+                </div>
+                <div class="parking-details">
+                    <div class="detail-row">
+                        <span>License Plate:</span>
+                        <strong id="active-plate"></strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Entry Time:</span>
+                        <strong id="entry-time-display"></strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Rate:</span>
+                        <strong>&#8377;5.00 / hour</strong>
+                    </div>
+                </div>
+
+                <div class="timer-container">
+                    <div class="time" id="time-elapsed">00:00:00</div>
+                    <div class="charge">Current Charge: <span id="current-charge">&#8377;0.00</span></div>
+                </div>
+
+                <!-- Parking Lot Map -->
+                <div class="visitor-lot-section">
+                    <div class="visitor-lot-header">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="2" y="3" width="20" height="18" rx="2" />
+                            <path d="M9 8h4a2 2 0 0 1 0 4H9v4" />
+                            <path d="M9 8v8" />
+                        </svg>
+                        <span>Your Spot in the Lot</span>
+                    </div>
+                    <div class="visitor-lot-wrapper" id="visitor-lot-wrapper">
+                        <!-- Populated by _updateActiveParkingSpot() in app.js -->
+                        <p
+                            style="font-size:13px; color:#f59e0b; text-align:center; padding:10px 0; display:flex; align-items:center; justify-content:center; gap:6px;">
+                            <span
+                                style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); border-radius:6px; padding:2px 8px; font-weight:700; font-size:11px; letter-spacing:0.5px;">REQUIRED</span>
+                            Tap <strong style="color:var(--text-main)">Normal</strong> or <strong
+                                style="color:var(--text-main)">Access ♿</strong> above to pick your spot.
+                        </p>
+                    </div>
+                    <p class="vl-spot-tag" id="vl-your-spot-label" style="display:none;"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Screen 6: Receipt -->
+        <section id="screen-receipt" class="screen">
+            <div class="card receipt-card">
+                <div class="success-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                </div>
+                <div class="header">
+                    <h1>Payment <span class="highlight">Processed</span></h1>
+                    <p>Thank you for visiting.</p>
+                </div>
+                <div class="receipt-details">
+                    <div class="detail-row">
+                        <span>Name:</span>
+                        <strong id="receipt-name"></strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>License Plate:</span>
+                        <strong id="receipt-plate"></strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Entry Time:</span>
+                        <strong id="receipt-entry"></strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Exit Time:</span>
+                        <strong id="receipt-exit"></strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Duration:</span>
+                        <strong id="receipt-duration"></strong>
+                    </div>
+                    <div class="divider"></div>
+                    <div class="detail-row total">
+                        <span>Total Paid (Auto):</span>
+                        <strong id="receipt-total"></strong>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="resetApp()">Home</button>
+            </div>
+        </section>
+    </div>
+    <canvas id="snapshot-canvas" style="display: none;"></canvas>
+
+    <!-- ===== PARKING SPOTS MODAL ===== -->
+    <div class="pm-overlay" id="pm-overlay" onclick="closeParkingModal(event)">
+        <div class="pm-modal" id="pm-modal">
+            <!-- Header -->
+            <div class="pm-header" id="pm-header">
+                <div class="pm-title-row">
+                    <span class="pm-icon" id="pm-icon"></span>
+                    <h2 class="pm-title" id="pm-title">Parking Spots</h2>
+                </div>
+                <div class="pm-stats" id="pm-stats"></div>
+                <button class="pm-close" onclick="closeParkingModal()" title="Close">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Legend -->
+            <div class="pm-legend">
+                <span class="pm-legend-item">
+                    <span class="pm-dot pm-dot-free" id="pm-dot-free"></span> Available
+                </span>
+                <span class="pm-legend-item">
+                    <span class="pm-dot pm-dot-taken"></span> Occupied
+                </span>
+            </div>
+
+            <!-- Spot Grid -->
+            <div class="pm-grid" id="pm-grid"></div>
+
+            <!-- Road bar at bottom -->
+            <div class="pm-road">
+                <span>&#8594; ENTRANCE</span>
+                <div class="pm-road-dash"></div>
+                <span>EXIT &#8594;</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/tesseract.js@v5.0.3/dist/tesseract.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>

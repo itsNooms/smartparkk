@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartParkk - Resident Portal</title>
+    <meta name="description" content="Resident portal for SmartParkk community gate access.">
+
+    <!-- PWA Setup -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#38bdf8">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3063/3063822.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div id="app" class="app-container">
+        <!-- Screen 1: Login -->
+        <section id="screen-login" class="screen active">
+            <div class="card">
+                <div class="header">
+                    <h1>Resident <span class="highlight">Login</span></h1>
+                    <p>Welcome back to SmartParkk</p>
+                </div>
+                <form id="login-form">
+                    <div class="input-group">
+                        <label for="login-flat">Flat ID or Tenant ID</label>
+                        <input type="text" id="login-flat" required placeholder="e.g. F-101 or F-101T"
+                            style="text-transform: uppercase;">
+                    </div>
+                    <div class="input-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required placeholder="••••••••">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <button type="submit" class="btn btn-primary">Login</button>
+                        <button type="button" class="btn btn-text"
+                            style="align-self: flex-end; font-size: 14px; margin-top: 0; padding: 0;"
+                            onclick="showScreen('screen-forgot')">Forgot Password?</button>
+                    </div>
+                    <button type="button" class="btn btn-text" onclick="showScreen('screen-register')">Don't have an
+                        account? Register</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Screen 1A: Forgot Password -->
+        <section id="screen-forgot" class="screen">
+            <div class="card">
+                <div class="header">
+                    <h1>Forgot <span class="highlight">Password</span></h1>
+                    <p>Verify your details to reset your password</p>
+                </div>
+                <form id="forgot-form">
+                    <div class="input-group">
+                        <label for="forgot-flat">Flat ID or Tenant ID</label>
+                        <input type="text" id="forgot-flat" required placeholder="e.g. F-101 or F-101T"
+                            style="text-transform: uppercase;">
+                    </div>
+                    <div class="input-group">
+                        <label for="forgot-phone">Phone Number</label>
+                        <input type="tel" id="forgot-phone" required placeholder="Enter registered 10 digit number">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Verify Details</button>
+                    <button type="button" class="btn btn-text" onclick="showScreen('screen-login')">Back to
+                        Login</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Screen 1A-OTP: Verify OTP for Password Reset -->
+        <section id="screen-forgot-otp" class="screen">
+            <div class="card">
+                <div class="header">
+                    <h1>Verify <span class="highlight">OTP</span></h1>
+                    <p>Enter the 4-digit code sent to your phone</p>
+                    <p class="mock-note" id="forgot-mock-note" style="display: none;"></p>
+                </div>
+                <form id="forgot-otp-form">
+                    <div class="otp-inputs" id="forgot-otp-inputs">
+                        <input type="text" maxlength="1" class="otp-input" required>
+                        <input type="text" maxlength="1" class="otp-input" required>
+                        <input type="text" maxlength="1" class="otp-input" required>
+                        <input type="text" maxlength="1" class="otp-input" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Verify OTP</button>
+                    <button type="button" class="btn btn-text" onclick="showScreen('screen-forgot')">Back</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Screen 1B: Reset Password -->
+        <section id="screen-reset" class="screen">
+            <div class="card">
+                <div class="header">
+                    <h1>Reset <span class="highlight">Password</span></h1>
+                    <p>Enter your new password</p>
+                </div>
+                <form id="reset-form">
+                    <div class="input-group">
+                        <label for="reset-password">New Password</label>
+                        <input type="password" id="reset-password" required placeholder="Create a new password">
+                    </div>
+                    <div class="input-group">
+                        <label for="reset-confirm-password">Confirm Password</label>
+                        <input type="password" id="reset-confirm-password" required placeholder="Confirm new password">
+                    </div>
+                    <div class="status-msg" id="resident-reset-error"
+                        style="color: var(--danger); display: none; margin-bottom: 15px; min-height: 0;">Passwords do
+                        not match!</div>
+                    <button type="submit" class="btn btn-primary">Save New Password</button>
+                    <button type="button" class="btn btn-text" onclick="showScreen('screen-login')">Cancel</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Screen 2: Registration -->
+        <section id="screen-register" class="screen">
+            <div class="card">
+                <div class="header">
+                    <h1>Resident <span class="highlight">Registration</span></h1>
+                    <p>Create your community account</p>
+                </div>
+                <form id="register-form">
+                    <div class="input-group">
+                        <label for="reg-name">Full Name</label>
+                        <input type="text" id="reg-name" required placeholder="John Doe">
+                    </div>
+                    <div class="input-group">
+                        <label for="reg-flat">Flat ID (Append 'T' for Tenant)</label>
+                        <input type="text" id="reg-flat" required placeholder="e.g. F-101 (Resident) or F-101T (Tenant)"
+                            style="text-transform: uppercase;">
+                    </div>
+                    <div class="input-group">
+                        <label for="reg-phone">Phone Number</label>
+                        <input type="tel" id="reg-phone" required placeholder="Enter 10 digit number">
+                    </div>
+                    <div class="input-group">
+                        <label>Car Number Plates (Up to 3)</label>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <input type="text" id="reg-car-1" placeholder="Plate 1 (optional) e.g. MH 12 AB 1234"
+                                style="text-transform: uppercase;">
+                            <input type="text" id="reg-car-2" placeholder="Plate 2 (optional)"
+                                style="text-transform: uppercase;">
+                            <input type="text" id="reg-car-3" placeholder="Plate 3 (optional)"
+                                style="text-transform: uppercase;">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="reg-password">Password</label>
+                        <input type="password" id="reg-password" required placeholder="Create a password">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Register</button>
+                    <button type="button" class="btn btn-text" onclick="showScreen('screen-login')">Already registered?
+                        Login</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Screen 3: Home / Dashboard -->
+        <section id="screen-home" class="screen">
+            <div class="card">
+                <div class="header" style="margin-bottom: 20px;">
+                    <h1>Welcome, <span class="highlight" id="resident-name-display">User</span></h1>
+                    <p>Flat ID: <strong id="resident-flat-display">F-101</strong> <span id="resident-role-tag"
+                            style="font-size: 12px; margin-left: 5px; padding: 2px 6px; border-radius: 4px; background-color: var(--primary); color: white; display: none;"></span>
+                    </p>
+                </div>
+
+
+
+                <div class="parking-details"
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div>
+                        <h3 style="font-size: 16px; color: var(--text-main); font-weight: 600;">Availability Status</h3>
+                        <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Let visitors know if
+                            you're available.</p>
+                    </div>
+                    <div>
+                        <button id="availability-toggle" class="btn"
+                            style="padding: 8px 16px; min-width: 120px; font-size: 14px; margin-top: 0; background-color: var(--success); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Available</button>
+                    </div>
+                </div>
+
+                <div class="parking-details">
+                    <h3 style="margin-bottom: 12px; font-size: 16px; color: var(--highlight);">Pending Approvals</h3>
+                    <div id="pending-approvals-list">
+                        <p style="color: var(--text-muted); font-size: 14px;">No visitors waiting for approval.</p>
+                    </div>
+                </div>
+
+                <div class="parking-details">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h3 style="font-size: 16px; color: var(--highlight);">My Vehicle</h3>
+                        <button onclick="openEditVehiclesModal()"
+                            style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">Edit</button>
+                    </div>
+                    <div id="my-vehicle-display">
+                        <p style="color: var(--text-muted); font-size: 14px;">No vehicle registered.</p>
+                    </div>
+                </div>
+
+                <div class="parking-details">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h3 style="font-size: 16px; color: var(--highlight);">Blocked Visitors</h3>
+                        <span id="blocked-count-badge"
+                            style="display: none; background: var(--danger); color: white; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 2px 8px;"></span>
+                    </div>
+                    <div id="blocked-visitors-list">
+                        <p style="color: var(--text-muted); font-size: 14px;">No visitors blocked.</p>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-danger" onclick="logoutResident()">Logout</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Block Confirmation Modal -->
+    <div id="block-modal-overlay"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); z-index:2000; justify-content:center; align-items:center; padding:20px;">
+        <div
+            style="background:#1e293b; border:1px solid rgba(255,255,255,0.12); border-radius:20px; padding:28px; max-width:380px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.5); animation: modalPop 0.25s cubic-bezier(0.34,1.56,0.64,1) both;">
+            <div style="text-align:center; margin-bottom:20px;">
+                <div id="block-modal-icon"
+                    style="width:56px; height:56px; border-radius:50%; background:rgba(239,68,68,0.15); color:#ef4444; display:flex; align-items:center; justify-content:center; font-size:26px; margin:0 auto 14px;">
+                    🚫</div>
+                <h3 id="block-modal-title" style="font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:6px;">
+                    Block Visitor?</h3>
+                <p id="block-modal-desc" style="font-size:14px; color:#94a3b8; line-height:1.5;"></p>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button id="block-modal-cancel" onclick="closeBlockModal()"
+                    style="flex:1; padding:13px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; background:transparent; color:#94a3b8; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">Cancel</button>
+                <button id="block-modal-confirm" onclick="confirmBlockAction()"
+                    style="flex:1; padding:13px; border:none; border-radius:10px; background:var(--danger); color:white; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">Block</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Vehicles Modal -->
+    <div id="edit-vehicles-modal-overlay"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); z-index:2000; justify-content:center; align-items:center; padding:20px;">
+        <div
+            style="background:#1e293b; border:1px solid rgba(255,255,255,0.12); border-radius:20px; padding:28px; max-width:380px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.5); animation: modalPop 0.25s cubic-bezier(0.34,1.56,0.64,1) both;">
+            <div style="text-align:center; margin-bottom:20px;">
+                <h3 style="font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:6px;">Edit Vehicles</h3>
+                <p style="font-size:14px; color:#94a3b8; line-height:1.5;">Update your registered number plates</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <input type="text" id="edit-car-1" placeholder="Plate 1"
+                    style="width: 100%; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; color: white; text-transform: uppercase;">
+                <input type="text" id="edit-car-2" placeholder="Plate 2"
+                    style="width: 100%; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; color: white; text-transform: uppercase;">
+                <input type="text" id="edit-car-3" placeholder="Plate 3"
+                    style="width: 100%; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; color: white; text-transform: uppercase;">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeEditVehiclesModal()"
+                    style="flex:1; padding:13px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; background:transparent; color:#94a3b8; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">Cancel</button>
+                <button id="edit-vehicles-confirm" onclick="saveVehicles()"
+                    style="flex:1; padding:13px; border:none; border-radius:10px; background:var(--primary); color:white; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes modalPop {
+            from {
+                opacity: 0;
+                transform: scale(0.85) translateY(16px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .block-visitor-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: rgba(239, 68, 68, 0.06);
+            border: 1px solid rgba(239, 68, 68, 0.18);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: background 0.2s;
+        }
+
+        .block-visitor-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .unblock-btn {
+            padding: 5px 12px;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 7px;
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.18s ease;
+        }
+
+        .unblock-btn:hover {
+            background: rgba(239, 68, 68, 0.22);
+            border-color: rgba(239, 68, 68, 0.6);
+        }
+
+        .block-btn-inline {
+            padding: 7px 12px;
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            border-radius: 7px;
+            background: rgba(239, 68, 68, 0.08);
+            color: #ef4444;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.18s ease;
+            white-space: nowrap;
+        }
+
+        .block-btn-inline:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.55);
+        }
+    </style>
+
+    <script src="js/resident.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,8 @@
+node_modules/
+.env
+.wwebjs_auth/
+.wwebjs_cache/
+.DS_Store
+*.log
+backend/subscriptions.json
+backend/vapid.json

@@ -1,0 +1,18 @@
+{
+    "name": "SmartParkk Resident Portal",
+    "short_name": "SmartParkk",
+    "description": "Resident Portal for Gate Access and Approvals",
+    "start_url": "/resident.html",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#38bdf8",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "https://cdn-icons-png.flaticon.com/512/3063/3063822.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
