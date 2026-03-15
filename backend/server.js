@@ -125,11 +125,6 @@ const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
-// Initialize session store after supabase is ready
-if (supabase) {
-    initSessionStore();
-}
-
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -279,14 +274,6 @@ const otpStore = {};  // phone -> { otp, expiresAt }
 let waReady = false;
 let latestQR = null;
 let whatsappSessionStore = null;
-
-// Initialize session store (after supabase is initialized)
-function initSessionStore() {
-    if (supabase) {
-        whatsappSessionStore = new SupabaseSessionStore(supabase);
-        console.log('📱 WhatsApp session store initialized');
-    }
-}
 
 const waClient = new Client({
     authStrategy: new LocalAuth({
@@ -1144,8 +1131,12 @@ app.listen(PORT, async () => {
 
     console.log('  ✓  WhatsApp OTP mode active.');
     
-    // Try to restore session from database
-    if (whatsappSessionStore) {
+    // Initialize session store after supabase is ready
+    if (supabase) {
+        whatsappSessionStore = new SupabaseSessionStore(supabase);
+        console.log('📱 WhatsApp session store initialized');
+        
+        // Try to restore session from database
         try {
             const savedSession = await whatsappSessionStore.read();
             if (savedSession) {
@@ -1156,6 +1147,8 @@ app.listen(PORT, async () => {
         } catch (e) {
             console.log('  ➤  No saved session. Scan the QR code when it appears.\n');
         }
+    } else {
+        console.log('  ➤  No Supabase connection. Using local session only.\n');
     }
     
     waClient.initialize();
