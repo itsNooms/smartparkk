@@ -43,8 +43,16 @@ async function subscribeUserToPush() {
     try {
         const registration = await navigator.serviceWorker.ready;
 
-        // VAPID Public Key from vapid.json
-        const vapidPublicKey = 'BJa73tjVMJrXLUVv9u3GgJNQ2oFCnIi0Yc9ioDY_8gSljmEM6nrHCvOaCju5YO0OhjzFbpcMd7k98RqV72J-kII';
+        // Fetch VAPID public key from backend
+        const vapidResponse = await fetch('/api/vapid-key');
+        const vapidData = await vapidResponse.json();
+        const vapidPublicKey = vapidData.publicKey;
+        
+        if (!vapidPublicKey) {
+            console.warn('VAPID public key not configured');
+            return;
+        }
+        
         const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
 
         const subscription = await registration.pushManager.subscribe({

@@ -646,6 +646,11 @@ app.post('/api/subscribe', (req, res) => {
     res.json({ success: true });
 });
 
+// Get VAPID public key for frontend
+app.get('/api/vapid-key', (req, res) => {
+    res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
 // Get pending requests for a specific flat
 app.get('/api/visitor-requests', async (req, res) => {
     const flatId = req.query.flatId;
