@@ -152,13 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 pendingResetAuth = phoneToSend;
 
-                if (data.needsTelegram) {
-                    mockNote.innerHTML = `📱 <strong>Get OTP on Telegram:</strong><br>
-                        Search <strong>@${data.botUsername}</strong> → send <code>/otp ${data.phone}</code><br>
-                        <span style="color:#f59e0b;font-size:13px;">⚡ Or use: <strong>${data.otp}</strong></span>`;
-                    mockNote.style.display = 'block';
-                } else {
-                    mockNote.innerHTML = '✅ OTP sent to your Telegram!';
+                if (mockNote) {
+                    mockNote.innerHTML = '✅ OTP sent to your WhatsApp!';
                     mockNote.style.display = 'block';
                 }
 

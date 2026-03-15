@@ -33,22 +33,30 @@ function saveSubscription(flatId, sub) {
     fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(subs, null, 2));
 }
 
-// Bypassing Jio DNS Blocking for Supabase
-const { setGlobalDispatcher, Agent } = require('undici');
-setGlobalDispatcher(new Agent({
-    connect: {
-        lookup: (hostname, options, callback) => {
-            if (hostname === 'yvgsllvxjidhlaysaprf.supabase.co') {
-                callback(null, [{ address: '104.18.39.10', family: 4 }]);
-            } else {
-                dns.lookup(hostname, options, (err, address, family) => {
-                    if (err) return callback(err);
-                    callback(null, [{ address, family }]);
-                });
+// Bypassing Jio DNS Blocking for Supabase (ONLY USE IF NEEDED LOCALLY)
+if (process.env.ENABLE_JIO_BYPASS === 'true') {
+    const { setGlobalDispatcher, Agent } = require('undici');
+    const supabaseHostname = new URL(process.env.SUPABASE_URL).hostname;
+
+    console.log(`[DNS] Enabling Jio bypass for ${supabaseHostname}`);
+
+    setGlobalDispatcher(new Agent({
+        connect: {
+            lookup: (hostname, options, callback) => {
+                if (hostname === supabaseHostname) {
+                    // This IP is a common Cloudflare IP for Supabase, but it can change.
+                    // Only use this if you are absolutely sure you are being blocked.
+                    callback(null, [{ address: '104.18.39.10', family: 4 }]);
+                } else {
+                    dns.lookup(hostname, options, (err, address, family) => {
+                        if (err) return callback(err);
+                        callback(null, [{ address, family }]);
+                    });
+                }
             }
         }
-    }
-}));
+    }));
+}
 
 // ============================================
 // SUPABASE CONFIG

@@ -10,21 +10,24 @@ const { setGlobalDispatcher, Agent } = require('undici');
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
-// Bypass Jio DNS blocking (same as server.js)
-setGlobalDispatcher(new Agent({
-    connect: {
-        lookup: (hostname, options, callback) => {
-            if (hostname === 'yvgsllvxjidhlaysaprf.supabase.co') {
-                callback(null, [{ address: '104.18.39.10', family: 4 }]);
-            } else {
-                dns.lookup(hostname, options, (err, address, family) => {
-                    if (err) return callback(err);
-                    callback(null, [{ address, family }]);
-                });
+// Bypass Jio DNS blocking (ONLY USE LOCALLY IF NEEDED)
+if (process.env.ENABLE_JIO_BYPASS === 'true') {
+    const supabaseHostname = new URL(process.env.SUPABASE_URL).hostname;
+    setGlobalDispatcher(new Agent({
+        connect: {
+            lookup: (hostname, options, callback) => {
+                if (hostname === supabaseHostname) {
+                    callback(null, [{ address: '104.18.39.10', family: 4 }]);
+                } else {
+                    dns.lookup(hostname, options, (err, address, family) => {
+                        if (err) return callback(err);
+                        callback(null, [{ address, family }]);
+                    });
+                }
             }
         }
-    }
-}));
+    }));
+}
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
