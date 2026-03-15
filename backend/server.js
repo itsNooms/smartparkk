@@ -9,7 +9,6 @@ const qrcode = require('qrcode-terminal');
 const dns = require('dns');
 const fs = require('fs');
 const webpush = require('web-push');
-dns.setDefaultResultOrder('ipv4first');
 
 // ============================================
 // WEB PUSH CONFIG
@@ -36,6 +35,7 @@ function saveSubscription(flatId, sub) {
 // Bypassing Jio DNS Blocking for Supabase (ONLY USE IF NEEDED LOCALLY)
 if (process.env.ENABLE_JIO_BYPASS === 'true') {
     const { setGlobalDispatcher, Agent } = require('undici');
+    dns.setDefaultResultOrder('ipv4first');
     const supabaseHostname = new URL(process.env.SUPABASE_URL).hostname;
 
     console.log(`[DNS] Enabling Jio bypass for ${supabaseHostname}`);
@@ -64,11 +64,30 @@ if (process.env.ENABLE_JIO_BYPASS === 'true') {
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error('\n  ✗ ERROR: SUPABASE_URL or SUPABASE_ANON_KEY is missing!');
+    console.error('    Please configure these environment variables in your hosting platform.\n');
+}
+
+const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Middleware to check if Supabase is initialized
+app.use('/api', (req, res, next) => {
+    if (!supabase) {
+        return res.status(503).json({
+            success: false,
+            message: 'Database connection not initialized. Please configure SUPABASE_URL and SUPABASE_ANON_KEY.'
+        });
+    }
+    next();
+});
+
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
 app.use(express.static(FRONTEND_DIR));
 
@@ -77,6 +96,34 @@ app.get('/', (req, res) => res.sendFile(path.join(FRONTEND_DIR, 'index.html')));
 app.get('/login', (req, res) => res.redirect('/admin'));
 app.get('/admin', (req, res) => res.sendFile(path.join(FRONTEND_DIR, 'admin.html')));
 app.get('/resident', (req, res) => res.sendFile(path.join(FRONTEND_DIR, 'resident.html')));
+
+// Health check for deployment verification
+app.get('/api/health', async (req, res) => {
+    const health = {
+        status: 'ok',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+        env: {
+            node_env: process.env.NODE_ENV || 'development',
+            supabase_set: !!SUPABASE_URL,
+            wa_ready: waReady
+        },
+        database: 'Checking...'
+    };
+
+    if (!supabase) {
+        health.database = 'Error: Supabase client not initialized (missing keys)';
+    } else {
+        try {
+            const { error } = await supabase.from('residents').select('id').limit(1);
+            health.database = error ? `Error: ${error.message}` : 'Connected';
+        } catch (e) {
+            health.database = `Error: ${e.message}`;
+        }
+    }
+
+    res.json(health);
+});
 
 // ============================================
 // SETTINGS API (SUPABASE)
@@ -137,7 +184,9 @@ const waClient = new Client({
             '--disable-gpu'
         ],
         headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null
+        executablePath: (process.env.PUPPETEER_EXECUTABLE_PATH && process.env.PUPPETEER_EXECUTABLE_PATH.trim() !== '')
+            ? process.env.PUPPETEER_EXECUTABLE_PATH
+            : undefined
     }
 });
 

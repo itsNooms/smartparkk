@@ -154,14 +154,16 @@ node server.js
 ## 📞 Deployment Support
 
 For issues or questions:
-1. Check Railway dashboard logs (Deployments → View logs)
-2. Check browser console for frontend errors
-3. Verify environment variables are correctly set in Railway
-4. Ensure Supabase database is accessible
+1. **Check Health Status**: Visit `https://your-app.railway.app/api/health` to see if the database is connected.
+2. **Setup Database**: If you get errors like `relation "visitors" does not exist`, run the contents of `FULL_DATABASE_SETUP.sql` in your Supabase SQL Editor.
+3. **Check Railway logs**: (Deployments → View logs) to see server startup messages and WhatsApp QR code.
+4. **Environment Variables**: Verify `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `VAPID_PUBLIC_KEY`, and `VAPID_PRIVATE_KEY` are set in Railway.
 
-## 🎯 Next Steps
+## 🎯 Important Note on WhatsApp
 
-- Monitor deployment in Railway dashboard
-- Test all three portals from mobile devices
-- Configure custom domain if needed
-- Set up monitoring and alerting
+WhatsApp Web.js requires a manual scan on every new deployment unless persistent storage is configured.
+1. Deploy your app.
+2. Open Railway Logs immediately.
+3. Wait for the QR code to appear (it's made of text characters).
+4. Scan it with your phone (WhatsApp → Linked Devices).
+5. Once scanned, you should see "✓ WhatsApp connected!" in the logs.
