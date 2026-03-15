@@ -88,7 +88,7 @@ function updateSpotsBanner(available, total) {
         setTimeout(() => countEl.classList.remove('popping'), 400);
     }
     lastSpotCount = available;
-    countEl.textContent = available;
+    countEl.textContent = `${available} / ${total}`;
 
     // Colour state
     inner.classList.remove('low', 'full');
