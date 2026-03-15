@@ -64,11 +64,10 @@ async function fetchAndUpdateSpots() {
         // Read total capacity (now updated from syncSettings; fallback to 50)
         const total = parseInt(localStorage.getItem('smartpark_total_parking') || '50');
 
-        // Per User Request: Show ONLY the value entered in admin (Total Capacity) 
-        // on the visitor banner instead of the calculated available count.
-        const valueToShow = total;
+        // Calculate available spots
+        const available = Math.max(0, total - occupied);
 
-        updateSpotsBanner(valueToShow, total);
+        updateSpotsBanner(available, total);
     } catch (e) {
         // Server unreachable — keep showing last value or hide
         const banner = document.getElementById('spots-banner');
