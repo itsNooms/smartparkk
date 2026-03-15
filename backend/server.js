@@ -294,10 +294,15 @@ app.post('/api/send-otp', async (req, res) => {
 
     if (waReady) {
         try {
-            const chatId = `91${cleanPhone}@c.us`; // +91 India prefix
+            // Smart phone formatting: 
+            // If 10 digits, assume India (+91). If more, use as is (assuming country code provided).
+            const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+            const chatId = `${fullPhone}@c.us`;
+
             await waClient.sendMessage(chatId,
                 `🔐 *SmartParkk OTP*\n\nYour OTP is: *${otp}*\n\n💡 *Parking Charges:*\nIf you exceed your parking duration, a ₹50 fine will be applied.\n\n_Expires in 5 minutes. Do not share this._`);
-            console.log(`[WhatsApp OTP] Sent ${otp} → +91${cleanPhone}`);
+
+            console.log(`[WhatsApp OTP] Sent ${otp} → ${fullPhone}`);
             return res.json({ success: true, message: 'OTP sent to your WhatsApp!' });
         } catch (err) {
             console.error('[WhatsApp Error]', err.message);

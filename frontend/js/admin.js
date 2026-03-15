@@ -153,7 +153,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 pendingResetAuth = phoneToSend;
 
                 if (mockNote) {
-                    mockNote.innerHTML = '✅ OTP sent to your WhatsApp!';
+                    if (data.demo) {
+                        mockNote.innerHTML = `⚠️ <b>WhatsApp not connected.</b><br>Using Demo OTP: <span style="font-size: 1.2em; color: var(--highlight);">${data.otp}</span>`;
+                    } else {
+                        mockNote.innerHTML = '✅ OTP sent to your WhatsApp!';
+                    }
                     mockNote.style.display = 'block';
                 }
 

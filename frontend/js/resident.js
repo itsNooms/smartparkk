@@ -247,7 +247,11 @@ forgotForm.addEventListener('submit', async (e) => {
 
                     const mockNote = document.getElementById('forgot-mock-note');
                     if (mockNote) {
-                        mockNote.innerHTML = '✅ OTP sent to your WhatsApp!';
+                        if (data.demo) {
+                            mockNote.innerHTML = `⚠️ <b>WhatsApp not connected.</b><br>Using Demo OTP: <span style="font-size: 1.2em; color: var(--primary);">${data.otp}</span>`;
+                        } else {
+                            mockNote.innerHTML = '✅ OTP sent to your WhatsApp!';
+                        }
                         mockNote.style.display = 'block';
                     }
 

@@ -751,7 +751,11 @@ registerForm.addEventListener('submit', async (e) => {
         if (data.success) {
             displayPhone.textContent = `+91 ${visitorData.phone}`;
             const mockNote = document.querySelector('.mock-note');
-            mockNote.innerHTML = '✅ OTP sent to your WhatsApp!';
+            if (data.demo) {
+                mockNote.innerHTML = `⚠️ <b>WhatsApp not connected.</b><br>Using Demo OTP: <span style="font-size: 1.2em; color: var(--highlight);">${data.otp}</span>`;
+            } else {
+                mockNote.innerHTML = '✅ OTP sent to your WhatsApp!';
+            }
             mockNote.style.display = 'block';
             showScreen('screen-otp');
             setTimeout(() => otpInputs[0].focus(), 100);
