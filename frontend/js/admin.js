@@ -1660,24 +1660,33 @@ async function adminGateContinuousScan() {
                     entryWrap.style.display = 'block';
 
                     entryBtn.onclick = async () => {
-                        const triggerRes = await fetch('/api/gate-notifications/trigger', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                requestId: matchedRequest.id,
-                                visitorName: matchedRequest.visitorName,
-                                licensePlate: matchedRequest.licensePlate,
-                                isManual: false
-                            })
-                        });
-                        const triggerData = await triggerRes.json();
-                        if (triggerData.success) {
+                        // Since notification was already created when resident approved,
+                        // find it and dismiss it to open the gate
+                        const notifRes = await fetch('/api/gate-notifications');
+                        const notifs = await notifRes.json();
+                        const existingNotif = notifs.find(n => n.requestId === matchedRequest.id && n.status === 'pending');
+                        
+                        if (existingNotif) {
+                            // Dismiss the existing notification to open the gate
                             await fetch('/api/gate-notifications/dismiss', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: triggerData.notificationId })
+                                body: JSON.stringify({ id: existingNotif.id })
+                            });
+                        } else {
+                            // Fallback: trigger a new notification if none exists
+                            await fetch('/api/gate-notifications/trigger', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    requestId: matchedRequest.id,
+                                    visitorName: matchedRequest.visitorName,
+                                    licensePlate: matchedRequest.licensePlate,
+                                    isManual: false
+                                })
                             });
                         }
+                        
                         entryWrap.style.display = 'none';
                         overlay.style.display = 'none';
                         statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Resuming...`;
