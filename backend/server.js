@@ -761,37 +761,6 @@ app.post('/api/visitor-requests/respond', async (req, res) => {
 
     const request = data[0];
     
-    // If approved, immediately trigger gate notification for admin
-    if (action === 'approved') {
-        const notifData = {
-            requestId: request.id,
-            licensePlate: request.license_plate,
-            visitingFlat: request.visiting_flat,
-            visitorName: request.visitor_name,
-            visitorPhone: request.visitor_phone,
-            type: 'approved'
-        };
-        
-        // Call the trigger endpoint internally
-        const { data: notif, error: notifError } = await supabase
-            .from('gate_notifications')
-            .insert([{
-                visitor_name: notifData.visitorName,
-                visitor_phone: notifData.visitorPhone,
-                license_plate: notifData.licensePlate,
-                visiting_flat: notifData.visitingFlat,
-                request_id: notifData.requestId,
-                status: 'pending',
-                type: 'approved',
-                created_at: new Date().toISOString()
-            }])
-            .select();
-        
-        if (!notifError && notif && notif.length > 0) {
-            console.log(`[GATE NOTIF] Triggered for request ${requestId}: ${notifData.licensePlate}`);
-        }
-    }
-
     res.json({ 
         success: true, 
         request: {
