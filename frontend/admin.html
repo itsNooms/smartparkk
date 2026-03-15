@@ -646,60 +646,60 @@
                 </div>
             </div>
 
-            <!-- Entrance Camera View -->
-            <div id="entry-view" class="view-section" style="display: none;">
+            <!-- Gate Camera View -->
+            <div id="gate-camera-view" class="view-section" style="display: none;">
                 <header class="top-nav">
                     <div>
-                        <h1>Entrance Camera</h1>
-                        <p class="subtitle">Scan incoming vehicles for approved entry</p>
+                        <h1>Gate Camera</h1>
+                        <p class="subtitle">Unified scanning for all incoming and exiting vehicles</p>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span
+                            style="width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block; box-shadow:0 0 8px #10b981;"></span>
+                        <span style="color:var(--text-muted); font-size:13px;">Auto-detecting entry/exit</span>
                     </div>
                 </header>
                 <div class="camera-ui-wrap"
-                    style="max-width: 600px; margin: 40px auto; background: rgba(15, 23, 42, 0.4); padding: 20px; border-radius: 16px; border: 1px solid var(--border);">
-                    <div class="camera-container" id="admin-entry-camera-container">
+                    style="max-width: 650px; margin: 30px auto; background: rgba(15, 23, 42, 0.4); padding: 25px; border-radius: 20px; border: 1px solid var(--border);">
+                    <div class="camera-container">
+                        <div class="monitor-overlay">LIVE GATE FEED</div>
                         <div class="scanner-line"></div>
-                        <video id="admin-entry-camera" autoplay playsinline muted class="camera-feed"></video>
-                        <div class="plate-overlay" id="detected-plate-admin-entry"
-                            style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:8px 16px; border-radius:8px; border:2px solid #10b981; font-size:20px; font-weight:bold; z-index:10; font-family:monospace;">
+                        <video id="gate-camera-feed" autoplay playsinline muted class="camera-feed"
+                            style="border-radius: 12px;"></video>
+                        <div class="plate-overlay" id="detected-plate-admin-gate"
+                            style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); color:white; padding:10px 20px; border-radius:10px; border:2px solid #3b82f6; font-size:22px; font-weight:800; z-index:10; font-family:monospace; letter-spacing: 1px;">
                             Scanning...</div>
                     </div>
-                    <div class="status-msg" id="admin-entry-status"
-                        style="text-align: center; margin-top: 15px; color: var(--text-main); font-weight: 500;">
-                        Entrance
-                        camera initializing...</div>
-                    <canvas id="admin-entry-snapshot-canvas" style="display: none;"></canvas>
 
-                    <div id="entry-match-result"
-                        style="display:none; margin-top: 20px; padding: 15px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.3); text-align: center;">
-                        <p style="color: var(--text-main); font-weight: 600; margin-bottom: 10px;"
-                            id="entry-match-text"></p>
-                        <button id="btn-entry-open-gate" class="btn btn-primary"
-                            style="width: 100%; margin-top: 5px;">Open Gate</button>
-                    </div>
-                </div>
-            </div>
+                    <div class="status-msg" id="gate-camera-status"
+                        style="text-align: center; margin-top: 15px; color: var(--text-main); font-weight: 500; min-height: 24px;">
+                        Initializing camera system...</div>
+                    <canvas id="gate-snapshot-canvas" style="display: none;"></canvas>
 
-            <!-- Exit Camera View -->
-            <div id="exit-view" class="view-section" style="display: none;">
-                <header class="top-nav">
-                    <div>
-                        <h1>Exit Camera</h1>
-                        <p class="subtitle">Live automatic exit plate scanning</p>
+                    <div id="gate-match-entry-result"
+                        style="display:none; margin-top: 20px; padding: 20px; background: rgba(16, 185, 129, 0.15); border-radius: 16px; border: 1px solid rgba(16, 185, 129, 0.4); text-align: center; animation: slideUp 0.3s ease;">
+                        <div
+                            style="color: #10b981; font-weight: 700; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
+                            ✅ Approved Entry Found</div>
+                        <p style="color: var(--text-main); font-weight: 500; font-size: 16px; margin-bottom: 15px;"
+                            id="gate-match-entry-text"></p>
+                        <button id="btn-gate-open-entry" class="btn btn-primary"
+                            style="width: 100%; background: linear-gradient(135deg, #10b981, #059669); border: none;">Open
+                            Gate for Entry</button>
                     </div>
-                </header>
-                <div
-                    style="max-width: 600px; margin: 40px auto; background: rgba(15, 23, 42, 0.4); padding: 20px; border-radius: 16px; border: 1px solid var(--border);">
-                    <div class="camera-container" id="admin-exit-camera-container">
-                        <div class="scanner-line"></div>
-                        <video id="admin-exit-camera" autoplay playsinline muted class="camera-feed"></video>
-                        <div class="plate-overlay" id="detected-plate-admin-exit"
-                            style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:8px 16px; border-radius:8px; border:2px solid #3b82f6; font-size:20px; font-weight:bold; z-index:10; font-family:monospace;">
-                            Scanning...</div>
+
+                    <div id="gate-match-exit-result"
+                        style="display:none; margin-top: 20px; padding: 20px; background: rgba(59, 130, 246, 0.15); border-radius: 16px; border: 1px solid rgba(59, 130, 246, 0.4); text-align: center; animation: slideUp 0.3s ease;">
+                        <div
+                            style="color: #3b82f6; font-weight: 700; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
+                            🚗 Vehicle Exit Registered</div>
+                        <p style="color: var(--text-main); font-weight: 500; font-size: 15px; margin-bottom: 5px;"
+                            id="gate-match-exit-plate"></p>
+                        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;"
+                            id="gate-match-exit-charge"></p>
+                        <div style="color: #60a5fa; font-weight: 600; font-size: 13px;">Gate auto-opening for exit...
+                        </div>
                     </div>
-                    <div class="status-msg" id="admin-exit-status"
-                        style="text-align: center; margin-top: 15px; color: var(--text-main); font-weight: 500;">Exit
-                        camera initializing...</div>
-                    <canvas id="admin-snapshot-canvas" style="display: none;"></canvas>
                 </div>
             </div>
 
