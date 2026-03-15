@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
+const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const dns = require('dns');
@@ -125,6 +126,55 @@ app.get('/api/health', async (req, res) => {
     res.json(health);
 });
 
+// QR Code Endpoint
+app.get('/api/qr', async (req, res) => {
+    if (waReady) {
+        return res.send(`
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; text-align: center;">
+                <h1 style="color: #25D366;">✓ WhatsApp is Connected!</h1>
+                <p>You can now close this tab and start using the app.</p>
+                <button onclick="window.close()" style="padding: 10px 20px; background: #25D366; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;">Close Tab</button>
+            </div>
+        `);
+    }
+    if (!latestQR) {
+        return res.send(`
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; text-align: center;">
+                <h1>Initializing WhatsApp...</h1>
+                <p>The server is starting the WhatsApp client. This page will refresh automatically in 5 seconds.</p>
+                <div style="width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #25D366; border-radius: 50%; animate: spin 2s linear infinite;"></div>
+                <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+                <script>setTimeout(()=>location.reload(), 5000)</script>
+            </div>
+        `);
+    }
+
+    try {
+        const qrImage = await QRCode.toDataURL(latestQR);
+        res.send(`
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; text-align: center; background: #f0f2f5;">
+                <h1 style="color: #25D366;">Scan for WhatsApp Connection</h1>
+                <p>Open WhatsApp on your phone &rarr; Linked Devices &rarr; Link a Device</p>
+                <div style="background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                    <img src="${qrImage}" style="width: 300px; height: 300px;" />
+                </div>
+                <p style="margin-top: 20px; color: #666;">This page will automatically refresh once connected.</p>
+                <script>
+                    setInterval(async () => {
+                        try {
+                            const res = await fetch('/api/health');
+                            const data = await res.json();
+                            if (data.env.wa_ready) location.reload();
+                        } catch(e) {}
+                    }, 3000);
+                </script>
+            </div>
+        `);
+    } catch (err) {
+        res.status(500).send('Error generating QR code');
+    }
+});
+
 // ============================================
 // SETTINGS API (SUPABASE)
 // ============================================
@@ -171,6 +221,7 @@ app.post('/api/settings', async (req, res) => {
 // ============================================
 const otpStore = {};  // phone -> { otp, expiresAt }
 let waReady = false;
+let latestQR = null;
 
 const waClient = new Client({
     authStrategy: new LocalAuth(),
@@ -191,13 +242,17 @@ const waClient = new Client({
 });
 
 waClient.on('qr', (qr) => {
+    latestQR = qr;
     console.log('\n  [WhatsApp] Scan this QR code with your WhatsApp:');
-    console.log('  (Open WhatsApp → Linked Devices → Link a Device)\n');
+    console.log('  (Open WhatsApp → Linked Devices → Link a Device)');
+    console.log('  👉 OR OPEN IN BROWSER: ' + (process.env.RAILWAY_STATIC_URL || 'https://' + process.env.RAILWAY_PUBLIC_DOMAIN || 'your-url') + '/api/qr');
+    console.log('  --------------------------------------------------\n');
     qrcode.generate(qr, { small: true });
 });
 
 waClient.on('ready', () => {
     waReady = true;
+    latestQR = null; // Clear QR when connected
     console.log('\n  ✓  WhatsApp connected! OTPs will be sent via WhatsApp.\n');
 });
 
