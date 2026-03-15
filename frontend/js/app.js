@@ -773,16 +773,39 @@ registerForm.addEventListener('submit', async (e) => {
 
 // OTP Input Logic
 otpInputs.forEach((input, index) => {
-    input.addEventListener('keyup', (e) => {
-        if (e.key >= 0 && e.key <= 9) {
+    // Use 'input' event for better mobile support
+    input.addEventListener('input', (e) => {
+        const value = e.target.value;
+        if (value.length >= 1) {
+            // Move to next input
             if (index < otpInputs.length - 1) {
                 otpInputs[index + 1].focus();
             }
-        } else if (e.key === 'Backspace') {
-            if (index > 0) {
+        }
+    });
+    
+    // Handle backspace
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace') {
+            if (!input.value && index > 0) {
                 otpInputs[index - 1].focus();
             }
         }
+    });
+    
+    // Handle paste
+    input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pastedData = (e.clipboardData || window.clipboardData).getData('text');
+        const digits = pastedData.replace(/\D/g, '').split('');
+        digits.forEach((digit, i) => {
+            if (index + i < otpInputs.length) {
+                otpInputs[index + i].value = digit;
+            }
+        });
+        // Focus last filled or next empty input
+        const nextIndex = Math.min(index + digits.length, otpInputs.length - 1);
+        otpInputs[nextIndex].focus();
     });
 });
 
