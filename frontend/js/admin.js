@@ -1681,9 +1681,23 @@ async function adminGateContinuousScan() {
                                 body: JSON.stringify({ id: triggerData.notificationId })
                             });
                             
+                            // Also add visitor to the visitors table with entry time
+                            const entryRes = await fetch('/api/visitors', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    id: Date.now().toString(),
+                                    name: matchedRequest.visitorName,
+                                    phone: matchedRequest.visitorPhone,
+                                    licensePlate: matchedRequest.licensePlate,
+                                    visitingFlat: matchedRequest.visitingFlatId,
+                                    entryTime: new Date().toISOString()
+                                })
+                            });
+                            
                             entryWrap.style.display = 'none';
                             overlay.style.display = 'none';
-                            statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Resuming...`;
+                            statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Entry recorded!`;
                             adminGateIsScanning = false;
                             setTimeout(adminGateContinuousScan, 3000);
                         };

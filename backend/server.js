@@ -560,12 +560,12 @@ app.get('/api/visitors', async (req, res) => {
 app.post('/api/visitors', async (req, res) => {
     const b = req.body;
     const { data, error } = await supabase.from('visitors').insert([{
-        id: b.id,
+        id: b.id || Date.now().toString(),
         name: b.name,
         phone: b.phone,
         license_plate: b.licensePlate,
         visiting_flat: b.visitingFlat,
-        entry_time: b.entryTime,
+        entry_time: b.entryTime || new Date().toISOString(),
         exit_time: b.exitTime || null,
         rate_per_hour: b.ratePerHour || 5,
         total_charge: b.totalCharge || 0,
