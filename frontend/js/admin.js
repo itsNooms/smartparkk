@@ -1642,7 +1642,7 @@ async function adminGateContinuousScan() {
             if (cleanText.length >= 4) {
                 overlay.textContent = cleanText;
                 overlay.style.display = 'block';
-                statusMsg.textContent = `Processing Plate: ${cleanText}...`;
+                statusMsg.textContent = `Scanning plate: ${cleanText}...`;
 
                 // 1. Check for ENTRY
                 let matchedRequest = null;
@@ -1654,7 +1654,8 @@ async function adminGateContinuousScan() {
 
                 if (matchedRequest) {
                     adminGateIsScanning = false;
-                    statusMsg.textContent = `🎯 Approved Entry Found: ${cleanText}`;
+                    statusMsg.textContent = `✅ Plate matched! Validating entry...`;
+
                     entryText.textContent = `${matchedRequest.visitorName} visiting ${matchedRequest.visitingFlatId}`;
                     entryWrap.style.display = 'block';
 
@@ -1695,7 +1696,7 @@ async function adminGateContinuousScan() {
 
                 if (matchedVisitor) {
                     adminGateIsScanning = false;
-                    statusMsg.textContent = `🚗 Vehicle Exit: ${cleanText}`;
+                    statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
 
                     const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
                     const entryMs = new Date(matchedVisitor.entryTime).getTime();
@@ -1713,6 +1714,7 @@ async function adminGateContinuousScan() {
                         })
                     });
 
+                    statusMsg.textContent = `🚗 Vehicle exit processed: ${cleanText}`;
                     exitPlateText.textContent = `Plate: ${cleanText}`;
                     exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
                     exitWrap.style.display = 'block';
