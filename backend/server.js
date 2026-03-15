@@ -559,6 +559,22 @@ app.get('/api/visitors', async (req, res) => {
 // Add a visitor (entry)
 app.post('/api/visitors', async (req, res) => {
     const b = req.body;
+    
+    // Check if this plate is already in the system (no exit_time)
+    const { data: existingVisitor } = await supabase
+        .from('visitors')
+        .select('id')
+        .eq('license_plate', b.licensePlate)
+        .is('exit_time', null)
+        .limit(1);
+
+    if (existingVisitor && existingVisitor.length > 0) {
+        return res.status(400).json({ 
+            success: false, 
+            message: `Vehicle with plate ${b.licensePlate} is already parked. Please scan again to exit.` 
+        });
+    }
+    
     const { data, error } = await supabase.from('visitors').insert([{
         id: b.id || Date.now().toString(),
         name: b.name,
