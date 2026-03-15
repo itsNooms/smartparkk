@@ -701,24 +701,47 @@ app.post('/api/visitor-requests/respond', async (req, res) => {
 
     console.log(`[REQUEST] Visitor request ${requestId} was ${action}`);
 
-    // 1. Check if visitor is already Active (in the visitors table)
-    const { data: existingVisitor } = await supabase
-        .from('visitors')
-        .select('id')
-        .eq('license_plate', data[0].license_plate)
-        .is('exit_time', null)
-        .limit(1);
+    const request = data[0];
+    
+    // If approved, immediately trigger gate notification for admin
+    if (action === 'approved') {
+        const notifData = {
+            requestId: request.id,
+            licensePlate: request.license_plate,
+            visitingFlat: request.visiting_flat,
+            visitorName: request.visitor_name,
+            visitorPhone: request.visitor_phone,
+            type: 'approved'
+        };
+        
+        // Call the trigger endpoint internally
+        const { data: notif, error: notifError } = await supabase
+            .from('gate_notifications')
+            .insert([{
+                visitor_name: notifData.visitorName,
+                visitor_phone: notifData.visitorPhone,
+                license_plate: notifData.licensePlate,
+                visiting_flat: notifData.visitingFlat,
+                request_id: notifData.requestId,
+                status: 'pending',
+                type: 'approved',
+                created_at: new Date().toISOString()
+            }])
+            .select();
+        
+        if (!notifError && notif && notif.length > 0) {
+            console.log(`[GATE NOTIF] Triggered for request ${requestId}: ${notifData.licensePlate}`);
+        }
+    }
 
-    // We no longer trigger notifications here. 
-    // They are triggered by the visitor app after camera validation.
-    console.log(`[GATE] Resident ${action} request ${requestId}. Notification will be triggered after camera validation.`);
-
-    const request = {
-        id: data[0].id,
-        visitorName: data[0].visitor_name,
-        status: data[0].status
-    };
-    res.json({ success: true, request });
+    res.json({ 
+        success: true, 
+        request: {
+            id: request.id,
+            visitorName: request.visitor_name,
+            status: request.status
+        }
+    });
 });
 
 
