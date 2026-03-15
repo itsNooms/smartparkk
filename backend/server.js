@@ -702,11 +702,32 @@ app.post('/api/visitor-requests', async (req, res) => {
     const sub = subs[request.visitingFlat.toUpperCase()];
     if (sub) {
         const payload = JSON.stringify({
-            title: 'New Visitor Request!',
-            body: `${request.visitorName} is waiting for your approval.`,
-            data: { url: '/resident.html' }
+            title: '🔔 New Visitor Request!',
+            body: `${request.visitorName} (${request.licensePlate}) is waiting for your approval.`,
+            icon: '/logo.png',
+            badge: '/logo.png',
+            vibrate: [100, 50, 100, 50, 200],
+            tag: 'smartparkk-visitor',
+            renotify: true,
+            requireInteraction: true,
+            data: { 
+                url: '/resident',
+                requestId: request.id,
+                visitorName: request.visitorName,
+                licensePlate: request.licensePlate,
+                visitingFlat: request.visitingFlat
+            }
         });
-        webpush.sendNotification(sub, payload).catch(err => console.error('[PUSH ERROR]', err));
+        
+        // Send push notification with options
+        const options = {
+            TTL: 60 * 60, // 1 hour
+            urgency: 'high'
+        };
+        
+        webpush.sendNotification(sub, payload, options)
+            .then(() => console.log(`✅ Push notification sent to ${request.visitingFlat}`))
+            .catch(err => console.error('[PUSH ERROR]', err));
     }
 
     res.json({ success: true, request });
