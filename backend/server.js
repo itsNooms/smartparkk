@@ -712,9 +712,15 @@ app.get('/api/vapid-key', (req, res) => {
 // Get pending requests for a specific flat
 app.get('/api/visitor-requests', async (req, res) => {
     const flatId = req.query.flatId;
+    const status = req.query.status; // Optional: filter by status
 
     // Always get ALL requests, then filter in JS for base flat matching
     let query = supabase.from('visitor_requests').select('*');
+    
+    // If status is specified, filter by it
+    if (status) {
+        query = query.eq('status', status);
+    }
     
     // Sort by most recent first
     query = query.order('created_at', { ascending: false });

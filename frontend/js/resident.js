@@ -523,7 +523,8 @@ async function loadPendingApprovals() {
 
     try {
         const baseFlatId = currentResident.baseFlatId || currentResident.flatInput;
-        const res = await fetch(`/api/visitor-requests?flatId=${encodeURIComponent(baseFlatId)}`);
+        // Only load PENDING requests
+        const res = await fetch(`/api/visitor-requests?flatId=${encodeURIComponent(baseFlatId)}&status=pending`);
         const requests = await res.json();
 
         if (!requests || requests.length === 0) {
