@@ -864,16 +864,16 @@ function startApprovalPolling() {
             if (data.status === 'approved') {
                 clearInterval(approvalPollInterval);
                 approvalPollInterval = null;
-                statusMsg.textContent = 'Approved! Opening gate...';
+                statusMsg.textContent = 'Approved! Please proceed to the gate.';
 
-                // Short delay then go to camera scan
+                // Go straight to waiting for admin to open gate
                 setTimeout(() => {
-                    showScreen('screen-entry-scan');
-                    startCamera('entry-camera').then(() => {
-                        continuousScan('entry-camera', requestAdminAccess, 60000);
-                    });
+                    showScreen('screen-admin-wait');
+                    // We also start polling for the admin to OPEN the gate
+                    // Note: We don't trigger the notification here anymore,
+                    // because the ADMIN CAMERA will trigger it when it scans the car.
+                    pollAdminGateAction();
                 }, 1500);
-
             } else if (data.status === 'rejected') {
                 clearInterval(approvalPollInterval);
                 approvalPollInterval = null;
@@ -916,7 +916,12 @@ async function requestAdminAccess() {
         const data = await res.json();
 
         if (data.success) {
-            pollAdminGateAction(data.notificationId);
+            if (data.status === 'opened') {
+                console.log('[GATE] Already opened by admin/auto, starting parking...');
+                startParking();
+            } else {
+                pollAdminGateAction(data.notificationId);
+            }
         } else {
             console.error('[Admin Trigger Error]', data);
             alert('Failed to alert security admin. Please try again or contact security.');
@@ -929,12 +934,20 @@ async function requestAdminAccess() {
 }
 
 function pollAdminGateAction(notifId) {
+    // If notifId is not provided, we poll by the global pendingRequestId
+    const idStr = notifId ? String(notifId) : null;
+    const pollUrl = idStr
+        ? `/api/gate-notifications/${idStr}/status`
+        : `/api/gate-notifications/status-by-request/${pendingRequestId}`;
+
     const pollInterval = setInterval(async () => {
         try {
-            const res = await fetch(`/api/gate-notifications/${notifId}/status`);
+            const res = await fetch(pollUrl);
+            if (!res.ok) return;
             const data = await res.json();
 
             if (data.status === 'opened') {
+                console.log('[GATE] Admin opened gate, starting parking...');
                 clearInterval(pollInterval);
                 startParking();
             }
@@ -942,6 +955,14 @@ function pollAdminGateAction(notifId) {
             console.error('Action poll error', err);
         }
     }, 2000); // Poll admin action every 2s
+
+    // Safeguard: Stop polling after 4 minutes to avoid battery drain if something is stuck
+    setTimeout(() => {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            console.warn('[GATE] Polling timed out after 4 minutes.');
+        }
+    }, 4 * 60 * 1000);
 }
 
 // 4. Active Parking

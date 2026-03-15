@@ -847,7 +847,26 @@ app.post('/api/gate-notifications/trigger', async (req, res) => {
     if (error) return res.status(500).json({ success: false, message: error.message });
 
     console.log(`[GATE NOTIF] Triggered by camera: ${licensePlate} for request ${requestId}`);
-    res.json({ success: true, notificationId: data[0].id });
+    res.json({
+        success: true,
+        notificationId: String(data[0].id),
+        status: data[0].status
+    });
+});
+
+// Get notification status (for visitor app polling by requestId)
+app.get('/api/gate-notifications/status-by-request/:requestId', async (req, res) => {
+    const { data, error } = await supabase
+        .from('gate_notifications')
+        .select('status')
+        .eq('request_id', req.params.requestId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (error || !data || data.length === 0) {
+        return res.json({ success: true, status: 'not_triggered' });
+    }
+    res.json({ success: true, status: data[0].status });
 });
 
 // Get notification status (for resident app polling)

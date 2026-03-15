@@ -336,6 +336,13 @@
                     </svg>
                     Parking Lot
                 </a>
+                <a href="#" class="nav-item" id="tab-entry">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                    </svg>
+                    Entrance Camera
+                </a>
                 <a href="#" class="nav-item" id="tab-exit">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="23 7 16 12 23 17 23 7"></polygon>
@@ -605,6 +612,39 @@
 
                     <div class="pl-section-label">ROW C</div>
                     <div class="pl-grid" id="pl-grid-c"></div>
+                </div>
+            </div>
+
+            <!-- Entrance Camera View -->
+            <div id="entry-view" class="view-section" style="display: none;">
+                <header class="top-nav">
+                    <div>
+                        <h1>Entrance Camera</h1>
+                        <p class="subtitle">Scan incoming vehicles for approved entry</p>
+                    </div>
+                </header>
+                <div class="camera-ui-wrap"
+                    style="max-width: 600px; margin: 40px auto; background: rgba(15, 23, 42, 0.4); padding: 20px; border-radius: 16px; border: 1px solid var(--border);">
+                    <div class="camera-container" id="admin-entry-camera-container">
+                        <div class="scanner-line"></div>
+                        <video id="admin-entry-camera" autoplay playsinline muted class="camera-feed"></video>
+                        <div class="plate-overlay" id="detected-plate-admin-entry"
+                            style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:8px 16px; border-radius:8px; border:2px solid #10b981; font-size:20px; font-weight:bold; z-index:10; font-family:monospace;">
+                            Scanning...</div>
+                    </div>
+                    <div class="status-msg" id="admin-entry-status"
+                        style="text-align: center; margin-top: 15px; color: var(--text-main); font-weight: 500;">
+                        Entrance
+                        camera initializing...</div>
+                    <canvas id="admin-entry-snapshot-canvas" style="display: none;"></canvas>
+
+                    <div id="entry-match-result"
+                        style="display:none; margin-top: 20px; padding: 15px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.3); text-align: center;">
+                        <p style="color: var(--text-main); font-weight: 600; margin-bottom: 10px;"
+                            id="entry-match-text"></p>
+                        <button id="btn-entry-open-gate" class="btn btn-primary"
+                            style="width: 100%; margin-top: 5px;">Open Gate</button>
+                    </div>
                 </div>
             </div>
 

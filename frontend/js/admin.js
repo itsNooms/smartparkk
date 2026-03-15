@@ -288,19 +288,14 @@ document.addEventListener('DOMContentLoaded', () => {
             pollGateNotifications();
         }, 3000);
 
-        // Start background exit camera
-        setTimeout(() => {
-            if (typeof startAdminExitCamera === 'function') {
-                startAdminExitCamera();
-            }
-        }, 1000);
+
 
         // Tab Navigation
         const tabDashboard = document.getElementById('tab-dashboard');
         const tabGate = document.getElementById('tab-gate');
         const tabResidents = document.getElementById('tab-residents');
         const tabHistory = document.getElementById('tab-history');
-        const tabParkingLot = document.getElementById('tab-parking-lot');
+        const tabEntry = document.getElementById('tab-entry');
         const tabExit = document.getElementById('tab-exit');
         const tabBlocked = document.getElementById('tab-blocked');
 
@@ -309,11 +304,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const viewResidents = document.getElementById('residents-view');
         const viewHistory = document.getElementById('history-view');
         const viewParkingLot = document.getElementById('parking-lot-view');
+        const viewEntry = document.getElementById('entry-view');
         const viewExit = document.getElementById('exit-view');
         const viewBlocked = document.getElementById('blocked-view');
 
-        const allTabs = [tabDashboard, tabGate, tabResidents, tabHistory, tabParkingLot, tabExit, tabBlocked];
-        const allViews = [viewDashboard, viewGate, viewResidents, viewHistory, viewParkingLot, viewExit, viewBlocked];
+        const allTabs = [tabDashboard, tabGate, tabResidents, tabHistory, tabParkingLot, tabEntry, tabExit, tabBlocked];
+        const allViews = [viewDashboard, viewGate, viewResidents, viewHistory, viewParkingLot, viewEntry, viewExit, viewBlocked];
 
         function switchTab(activeTab, activeView) {
             allTabs.forEach(t => t.classList.remove('active'));
@@ -351,15 +347,24 @@ document.addEventListener('DOMContentLoaded', () => {
             loadParkingLot();
         });
 
+        tabEntry.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchTab(tabEntry, viewEntry);
+            stopAdminCamera();
+            startAdminEntryCamera();
+        });
+
         tabExit.addEventListener('click', (e) => {
             e.preventDefault();
             switchTab(tabExit, viewExit);
+            stopAdminCamera();
             startAdminExitCamera();
         });
 
         tabBlocked.addEventListener('click', (e) => {
             e.preventDefault();
             switchTab(tabBlocked, viewBlocked);
+            stopAdminCamera();
             loadBlockedVisitors();
         });
 
@@ -1020,80 +1025,130 @@ function updateGateTabBadge(count) {
 
 async function openGateFromView(notifId, btnEl) {
     const idStr = String(notifId);
-    _processedGateNotifs.add(idStr);
-    _shownGateNotifs.delete(idStr);
-    saveNotifState();
+    let originalText = '';
+    if (btnEl) {
+        originalText = btnEl.innerHTML;
+        btnEl.disabled = true;
+        btnEl.innerHTML = 'Opening...';
+    }
 
-    if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = '✅ Gate Opened!'; btnEl.style.background = 'linear-gradient(135deg,#059669,#047857)'; }
     try {
-        await fetch('/api/gate-notifications/dismiss', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const res = await fetch('/api/gate-notifications/dismiss', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: notifId })
         });
-    } catch (e) { console.error('[GATE]', e); }
-    removeGateCard(notifId);
-    setTimeout(() => _removeGvCard(notifId), 1200);
+        const data = await res.json();
+
+        if (data.success) {
+            _processedGateNotifs.add(idStr);
+            _shownGateNotifs.delete(idStr);
+            saveNotifState();
+
+            if (btnEl) {
+                btnEl.innerHTML = '✅ Gate Opened!';
+                btnEl.style.background = 'linear-gradient(135deg,#059669,#047857)';
+            }
+            // Animate out after a brief "opened" flash
+            setTimeout(() => {
+                removeGateCard(notifId);
+                _removeGvCard(notifId);
+            }, 1200);
+        } else {
+            throw new Error(data.message || 'Server failed to open gate');
+        }
+    } catch (e) {
+        console.error('[GATE] Open error:', e);
+        alert('Failed to open gate: ' + e.message);
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = originalText;
+        }
+    }
 }
 
 async function dismissFromView(notifId) {
     const idStr = String(notifId);
-    _processedGateNotifs.add(idStr);
-    _shownGateNotifs.delete(idStr);
-    saveNotifState();
-
     try {
-        await fetch('/api/gate-notifications/dismiss', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const res = await fetch('/api/gate-notifications/dismiss', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: notifId })
         });
-    } catch (e) { console.error('[GATE]', e); }
-    removeGateCard(notifId);
-    _removeGvCard(notifId);
+        const data = await res.json();
+        if (data.success) {
+            _processedGateNotifs.add(idStr);
+            _shownGateNotifs.delete(idStr);
+            saveNotifState();
+            removeGateCard(notifId);
+            _removeGvCard(notifId);
+        } else {
+            console.error('[GATE] Dismiss failed:', data.message);
+        }
+    } catch (e) {
+        console.error('[GATE] Dismiss error:', e);
+    }
 }
 
 async function openGate(notifId, btnEl) {
     const idStr = String(notifId);
-    _processedGateNotifs.add(idStr);
-    _shownGateNotifs.delete(idStr);
-    saveNotifState();
-
-    const card = document.getElementById(`gate-alert-${notifId}`);
+    let originalText = '';
     if (btnEl) {
+        originalText = btnEl.innerHTML;
         btnEl.disabled = true;
-        btnEl.innerHTML = '✅ Gate Opened!';
-        btnEl.style.background = 'linear-gradient(135deg, #059669, #047857)';
+        btnEl.innerHTML = 'Opening...';
     }
 
     try {
-        await fetch('/api/gate-notifications/dismiss', {
+        const res = await fetch('/api/gate-notifications/dismiss', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: notifId })
         });
+        const data = await res.json();
+
+        if (data.success) {
+            _processedGateNotifs.add(idStr);
+            _shownGateNotifs.delete(idStr);
+            saveNotifState();
+
+            if (btnEl) {
+                btnEl.innerHTML = '✅ Gate Opened!';
+                btnEl.style.background = 'linear-gradient(135deg, #059669, #047857)';
+            }
+            // Animate out after a brief "opened" flash
+            setTimeout(() => removeGateCard(notifId), 1200);
+        } else {
+            throw new Error(data.message || 'Server failed to open gate');
+        }
     } catch (err) {
         console.error('[GATE] Dismiss error:', err);
+        alert('Failed to open gate: ' + err.message);
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = originalText;
+        }
     }
-
-    // Animate out after a brief "opened" flash
-    setTimeout(() => removeGateCard(notifId), 1200);
 }
 
 async function dismissGateAlert(notifId, btnEl) {
     const idStr = String(notifId);
-    _processedGateNotifs.add(idStr);
-    _shownGateNotifs.delete(idStr);
-    saveNotifState();
-
     try {
-        await fetch('/api/gate-notifications/dismiss', {
+        const res = await fetch('/api/gate-notifications/dismiss', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: notifId })
         });
+        const data = await res.json();
+        if (data.success) {
+            _processedGateNotifs.add(idStr);
+            _shownGateNotifs.delete(idStr);
+            saveNotifState();
+            removeGateCard(notifId);
+        }
     } catch (err) {
         console.error('[GATE] Dismiss error:', err);
     }
-    removeGateCard(notifId);
 }
 
 function removeGateCard(notifId) {
@@ -1409,7 +1464,8 @@ async function adminUnblockVisitor(residentFlatId, visitorPhone, btnEl) {
 // ADMIN EXIT CAMERA & OCR LOGIC
 // =============================================
 let adminTesseractWorker = null;
-let adminIsScanning = false;
+let adminExitIsScanning = false;
+let adminEntryIsScanning = false;
 let adminCurrentStream = null;
 
 // Initialize Tesseract on load
@@ -1496,7 +1552,7 @@ async function startAdminExitCamera() {
         }
     }
     video.srcObject = adminCurrentStream;
-    adminContinuousScan();
+    adminExitContinuousScan();
 }
 
 function stopAdminCamera() {
@@ -1504,12 +1560,13 @@ function stopAdminCamera() {
         adminCurrentStream.getTracks().forEach(t => t.stop());
         adminCurrentStream = null;
     }
-    adminIsScanning = false;
+    adminExitIsScanning = false;
+    adminEntryIsScanning = false;
 }
 
 // (Camera remains running in the background when changing tabs)
 
-async function adminContinuousScan() {
+async function adminExitContinuousScan() {
     const video = document.getElementById('admin-exit-camera');
     const canvas = document.getElementById('admin-snapshot-canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -1519,17 +1576,17 @@ async function adminContinuousScan() {
     if (!adminTesseractWorker) {
         statusMsg.textContent = "OCR engine missing or loading...";
         // retry after a bit
-        setTimeout(adminContinuousScan, 2000);
+        setTimeout(adminExitContinuousScan, 2000);
         return;
     }
 
-    adminIsScanning = true;
+    adminExitIsScanning = true;
     statusMsg.textContent = "Scanning for exiting vehicles...";
     overlay.style.display = 'none';
 
-    while (adminIsScanning) {
+    while (adminExitIsScanning) {
         await new Promise(r => setTimeout(r, 800));
-        if (!adminIsScanning) break;
+        if (!adminExitIsScanning) break;
 
         if (video.readyState !== video.HAVE_ENOUGH_DATA) continue;
 
@@ -1602,12 +1659,170 @@ async function adminContinuousScan() {
                         overlay.style.display = 'none';
                         overlay.style.borderColor = '#3b82f6';
                         if (document.getElementById('exit-view').style.display !== 'none') {
-                            adminContinuousScan(); // resume scanning
+                            adminExitContinuousScan(); // resume scanning
                         }
                     }, 6000);
                 }
             } else {
                 statusMsg.textContent = "Scanning for exiting vehicles...";
+            }
+        } catch (e) { console.warn(e); }
+    }
+}
+// =============================================
+// ADMIN ENTRANCE CAMERA & OCR LOGIC
+// =============================================
+
+async function startAdminEntryCamera() {
+    if (adminCurrentStream) return;
+    const video = document.getElementById('admin-entry-camera');
+    const statusMsg = document.getElementById('admin-entry-status');
+    statusMsg.textContent = "Requesting entrance camera...";
+
+    try {
+        adminCurrentStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: 'environment' } }
+        });
+    } catch (e) {
+        try {
+            adminCurrentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch (err) {
+            statusMsg.textContent = "Camera access denied.";
+            return;
+        }
+    }
+    video.srcObject = adminCurrentStream;
+    adminEntryContinuousScan();
+}
+
+async function adminEntryContinuousScan() {
+    const video = document.getElementById('admin-entry-camera');
+    const canvas = document.getElementById('admin-entry-snapshot-canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const statusMsg = document.getElementById('admin-entry-status');
+    const overlay = document.getElementById('detected-plate-admin-entry');
+    const matchBox = document.getElementById('entry-match-result');
+    const matchText = document.getElementById('entry-match-text');
+    const openBtn = document.getElementById('btn-entry-open-gate');
+
+    if (!adminTesseractWorker) {
+        statusMsg.textContent = "OCR engine loading...";
+        setTimeout(adminEntryContinuousScan, 2000);
+        return;
+    }
+
+    adminEntryIsScanning = true;
+    statusMsg.textContent = "Scanning for incoming vehicles...";
+    overlay.style.display = 'none';
+    matchBox.style.display = 'none';
+
+    while (adminEntryIsScanning) {
+        await new Promise(r => setTimeout(r, 800));
+        if (!adminEntryIsScanning) break;
+        if (video.readyState !== video.HAVE_ENOUGH_DATA) continue;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        try {
+            const processed = preprocessAdminPlate(canvas);
+            const res = await adminTesseractWorker.recognize(processed);
+            const cleanText = normaliseAdminOCR(res.data.text);
+
+            if (cleanText.length > 3) {
+                statusMsg.textContent = `Seen: ${cleanText}... looking for match`;
+
+                let matchedRequest = null;
+                try {
+                    // Look for approved visitor requests that haven't entered yet
+                    const rRes = await fetch('/api/visitor-requests');
+                    const allReqs = await rRes.json();
+
+                    // We need requests with status 'approved'
+                    const approvedReqs = (allReqs || []).filter(r => r.status === 'approved');
+
+                    for (let req of approvedReqs) {
+                        const targetPlate = normaliseAdminOCR(req.licensePlate);
+                        if (adminFuzzyMatch(targetPlate, cleanText)) {
+                            matchedRequest = req;
+                            break;
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Could not fetch requests for entry check", err);
+                }
+
+                if (matchedRequest) {
+                    const targetPlate = normaliseAdminOCR(matchedRequest.licensePlate);
+                    console.log(`Match Found! Approved target: ${targetPlate}`);
+
+                    overlay.textContent = targetPlate;
+                    overlay.style.display = 'block';
+                    statusMsg.textContent = `✅ Plate ${targetPlate} matched an approved request!`;
+
+                    matchText.innerHTML = `
+                        Matched: <strong>${matchedRequest.visitorName}</strong><br>
+                        Plate: <strong>${targetPlate}</strong><br>
+                        Flat: <strong>${matchedRequest.visitingFlat}</strong>
+                    `;
+                    matchBox.style.display = 'block';
+
+                    // Trigger a notification so it appears in Gate Control as well
+                    const triggerRes = await fetch('/api/gate-notifications/trigger', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            requestId: matchedRequest.id,
+                            licensePlate: matchedRequest.licensePlate,
+                            visitingFlat: matchedRequest.visitingFlat,
+                            visitorName: matchedRequest.visitorName,
+                            visitorPhone: matchedRequest.visitorPhone
+                        })
+                    });
+                    const triggerData = await triggerRes.json();
+                    const notifId = triggerData.notificationId;
+
+                    openBtn.onclick = async () => {
+                        openBtn.disabled = true;
+                        openBtn.textContent = 'Opening Gate...';
+
+                        // We use the dismissal logic to "open" it
+                        const openRes = await fetch('/api/gate-notifications/dismiss', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: notifId })
+                        });
+                        const openData = await openRes.json();
+
+                        if (openData.success) {
+                            openBtn.textContent = '✅ Gate Opened!';
+                            openBtn.style.background = '#10b981';
+
+                            // Mark as processed in admin state
+                            _processedGateNotifs.add(String(notifId));
+                            saveNotifState();
+
+                            setTimeout(() => {
+                                matchBox.style.display = 'none';
+                                overlay.style.display = 'none';
+                                openBtn.disabled = false;
+                                openBtn.textContent = 'Open Gate';
+                                openBtn.style.background = '';
+                                if (document.getElementById('entry-view').style.display !== 'none') {
+                                    adminEntryContinuousScan();
+                                }
+                            }, 5000);
+                        } else {
+                            alert('Failed to open gate: ' + openData.message);
+                            openBtn.disabled = false;
+                            openBtn.textContent = 'Open Gate';
+                        }
+                    };
+
+                    adminEntryIsScanning = false; // Pause scan while showing match
+                    break;
+                }
             }
         } catch (e) { console.warn(e); }
     }
