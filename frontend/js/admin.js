@@ -282,6 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadTableData();
         loadResidentsData();
+        startGateMonitors();
         refreshInterval = setInterval(() => {
             loadTableData();
             loadResidentsData();
@@ -321,43 +322,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tabDashboard.addEventListener('click', (e) => {
             e.preventDefault();
+            stopAdminCamera();
             switchTab(tabDashboard, viewDashboard);
+            startGateMonitors();
         });
 
         tabGate.addEventListener('click', (e) => {
             e.preventDefault();
+            stopAdminCamera();
             switchTab(tabGate, viewGate);
+            startGateMonitors();
         });
 
         tabResidents.addEventListener('click', (e) => {
             e.preventDefault();
+            stopAdminCamera();
             switchTab(tabResidents, viewResidents);
             loadResidentsData();
         });
 
         tabHistory.addEventListener('click', (e) => {
             e.preventDefault();
+            stopAdminCamera();
             switchTab(tabHistory, viewHistory);
-            // Data is already loaded by loadTableData() in interval
         });
 
         tabParkingLot.addEventListener('click', (e) => {
             e.preventDefault();
+            stopAdminCamera();
             switchTab(tabParkingLot, viewParkingLot);
             loadParkingLot();
         });
 
         tabEntry.addEventListener('click', (e) => {
             e.preventDefault();
-            switchTab(tabEntry, viewEntry);
             stopAdminCamera();
+            switchTab(tabEntry, viewEntry);
             startAdminEntryCamera();
         });
 
         tabExit.addEventListener('click', (e) => {
             e.preventDefault();
-            switchTab(tabExit, viewExit);
             stopAdminCamera();
+            switchTab(tabExit, viewExit);
             startAdminExitCamera();
         });
 
@@ -1466,7 +1473,7 @@ async function adminUnblockVisitor(residentFlatId, visitorPhone, btnEl) {
 let adminTesseractWorker = null;
 let adminExitIsScanning = false;
 let adminEntryIsScanning = false;
-let adminCurrentStream = null;
+let _activeStreams = {}; // { 'entry': stream, 'exit': stream, 'gate-entry': stream, 'gate-exit': stream }
 
 // Initialize Tesseract on load
 (async () => {
@@ -1534,34 +1541,96 @@ function adminFuzzyMatch(a, b) {
 }
 
 async function startAdminExitCamera() {
-    if (adminCurrentStream) return;
+    if (_activeStreams['exit']) return;
     const video = document.getElementById('admin-exit-camera');
     const statusMsg = document.getElementById('admin-exit-status');
+    if (!video) return;
     statusMsg.textContent = "Requesting camera...";
 
     try {
-        adminCurrentStream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { exact: 'environment' } }
         });
+        _activeStreams['exit'] = stream;
+        video.srcObject = stream;
     } catch (e) {
         try {
-            adminCurrentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            _activeStreams['exit'] = stream;
+            video.srcObject = stream;
         } catch (err) {
             statusMsg.textContent = "Camera access denied.";
             return;
         }
     }
-    video.srcObject = adminCurrentStream;
     adminExitContinuousScan();
 }
 
 function stopAdminCamera() {
-    if (adminCurrentStream) {
-        adminCurrentStream.getTracks().forEach(t => t.stop());
-        adminCurrentStream = null;
-    }
+    Object.keys(_activeStreams).forEach(key => {
+        if (_activeStreams[key]) {
+            _activeStreams[key].getTracks().forEach(t => t.stop());
+            delete _activeStreams[key];
+        }
+    });
     adminExitIsScanning = false;
     adminEntryIsScanning = false;
+}
+
+// Gate Control Monitors (CCTV)
+async function startGateMonitors() {
+    // Entrance elements
+    const gateEntryVid = document.getElementById('gate-entry-video');
+    const dashEntryVid = document.getElementById('dash-entry-video');
+    const gateEntryStatus = document.getElementById('gate-entry-status');
+    const dashEntryStatus = document.getElementById('dash-entry-status');
+
+    // Exit elements
+    const gateExitVid = document.getElementById('gate-exit-video');
+    const dashExitVid = document.getElementById('dash-exit-video');
+    const gateExitStatus = document.getElementById('gate-exit-status');
+    const dashExitStatus = document.getElementById('dash-exit-status');
+
+    // Start Entrance feed
+    if (!_activeStreams['gate-entry'] && (gateEntryVid || dashEntryVid)) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            _activeStreams['gate-entry'] = stream;
+            if (gateEntryVid) gateEntryVid.srcObject = stream;
+            if (dashEntryVid) dashEntryVid.srcObject = stream;
+
+            if (gateEntryStatus) gateEntryStatus.textContent = "Live Entry Feed";
+            if (dashEntryStatus) dashEntryStatus.textContent = "Live";
+        } catch (e) {
+            console.warn("Entry cam failed", e);
+            if (gateEntryStatus) gateEntryStatus.textContent = "Entry Cam Error";
+            if (dashEntryStatus) dashEntryStatus.textContent = "Error";
+        }
+    } else if (_activeStreams['gate-entry']) {
+        // Just re-attach if already running
+        if (gateEntryVid) gateEntryVid.srcObject = _activeStreams['gate-entry'];
+        if (dashEntryVid) dashEntryVid.srcObject = _activeStreams['gate-entry'];
+    }
+
+    // Start Exit feed
+    if (!_activeStreams['gate-exit'] && (gateExitVid || dashExitVid)) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            _activeStreams['gate-exit'] = stream;
+            if (gateExitVid) gateExitVid.srcObject = stream;
+            if (dashExitVid) dashExitVid.srcObject = stream;
+
+            if (gateExitStatus) gateExitStatus.textContent = "Live Exit Feed";
+            if (dashExitStatus) dashExitStatus.textContent = "Live";
+        } catch (e) {
+            console.warn("Exit cam failed", e);
+            if (gateExitStatus) gateExitStatus.textContent = "Exit Cam Error";
+            if (dashExitStatus) dashExitStatus.textContent = "Error";
+        }
+    } else if (_activeStreams['gate-exit']) {
+        if (gateExitVid) gateExitVid.srcObject = _activeStreams['gate-exit'];
+        if (dashExitVid) dashExitVid.srcObject = _activeStreams['gate-exit'];
+    }
 }
 
 // (Camera remains running in the background when changing tabs)
@@ -1674,24 +1743,29 @@ async function adminExitContinuousScan() {
 // =============================================
 
 async function startAdminEntryCamera() {
-    if (adminCurrentStream) return;
+    if (_activeStreams['entry']) return;
     const video = document.getElementById('admin-entry-camera');
     const statusMsg = document.getElementById('admin-entry-status');
+    if (!video) return;
     statusMsg.textContent = "Requesting entrance camera...";
 
     try {
-        adminCurrentStream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { exact: 'environment' } }
         });
+        _activeStreams['entry'] = stream;
+        video.srcObject = stream;
     } catch (e) {
         try {
-            adminCurrentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            _activeStreams['entry'] = stream;
+            video.srcObject = stream;
         } catch (err) {
             statusMsg.textContent = "Camera access denied.";
             return;
         }
     }
-    video.srcObject = adminCurrentStream;
+    video.srcObject = _activeStreams['entry'];
     adminEntryContinuousScan();
 }
 
