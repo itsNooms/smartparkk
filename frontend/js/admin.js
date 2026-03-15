@@ -285,6 +285,8 @@ document.addEventListener('DOMContentLoaded', () => {
         loadTableData();
         loadResidentsData();
         startGateMonitors();
+        adminGateContinuousScan();  // Start plate scanning on dashboard load
+        
         refreshInterval = setInterval(() => {
             loadTableData();
             loadResidentsData();
