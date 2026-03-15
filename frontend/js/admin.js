@@ -1,6 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
     const SESSION_LIMIT = 10 * 60 * 1000; // 10 minutes
 
+    // Dashboard state - declared at top to avoid temporal dead zone
+    let dashboardInitialized = false;
+    let refreshInterval = null;
+
     // ============================================
     // SCREEN MANAGEMENT
     // ============================================
@@ -248,8 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================
     // DASHBOARD LOGIC
     // ============================================
-    let dashboardInitialized = false;
-    let refreshInterval = null;
 
     function initDashboard() {
         if (dashboardInitialized) return;
@@ -296,10 +298,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const tabGate = document.getElementById('tab-gate');
         const tabResidents = document.getElementById('tab-residents');
         const tabHistory = document.getElementById('tab-history');
-        const tabEntry = document.getElementById('tab-entry');
-        const tabExit = document.getElementById('tab-exit');
-        const tabBlocked = document.getElementById('tab-blocked');
+        const tabParkingLot = document.getElementById('tab-parking-lot');
         const tabGateCamera = document.getElementById('tab-gate-camera');
+        const tabBlocked = document.getElementById('tab-blocked');
 
         const viewDashboard = document.getElementById('dashboard-view');
         const viewGate = document.getElementById('gate-view');
