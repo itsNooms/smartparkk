@@ -91,6 +91,14 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 8. WhatsApp Sessions (for persistent WhatsApp sessions across deployments)
+CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+    key TEXT PRIMARY KEY,
+    session_data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Initial Settings Data
 INSERT INTO settings (key, value) VALUES 
 ('smartpark_total_parking', '21'),
@@ -109,6 +117,16 @@ ALTER TABLE gate_notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE blocked_visitors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE whatsapp_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Add opened_at column if it doesn't exist (for existing installations)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name='gate_notifications' AND column_name='opened_at') THEN
+        ALTER TABLE gate_notifications ADD COLUMN opened_at TIMESTAMPTZ;
+    END IF;
+END $$;
 
 CREATE POLICY "Allow all for anon" ON residents FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for anon" ON visitors FOR ALL USING (true) WITH CHECK (true);
@@ -117,3 +135,4 @@ CREATE POLICY "Allow all for anon" ON gate_notifications FOR ALL USING (true) WI
 CREATE POLICY "Allow all for anon" ON blocked_visitors FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for anon" ON settings FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for anon" ON push_subscriptions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for anon" ON whatsapp_sessions FOR ALL USING (true) WITH CHECK (true);
