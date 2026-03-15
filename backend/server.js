@@ -12,6 +12,57 @@ const fs = require('fs');
 const webpush = require('web-push');
 
 // ============================================
+// WHATSAPP SESSION STORE (Supabase-based)
+// ============================================
+class SupabaseSessionStore {
+    constructor(supabase) {
+        this.supabase = supabase;
+        this.sessionKey = 'whatsapp-session-main';
+    }
+
+    async read() {
+        try {
+            const { data, error } = await this.supabase
+                .from('whatsapp_sessions')
+                .select('session_data')
+                .eq('key', this.sessionKey)
+                .single();
+
+            if (error || !data) {
+                console.log('📱 No WhatsApp session found in database');
+                return null;
+            }
+
+            console.log('📱 WhatsApp session loaded from database');
+            return data.session_data;
+        } catch (e) {
+            console.error('Error reading session from database:', e.message);
+            return null;
+        }
+    }
+
+    async write(data) {
+        try {
+            const { error } = await this.supabase
+                .from('whatsapp_sessions')
+                .upsert({
+                    key: this.sessionKey,
+                    session_data: data,
+                    updated_at: new Date().toISOString()
+                });
+
+            if (error) {
+                console.error('Error saving session to database:', error.message);
+            } else {
+                console.log('📱 WhatsApp session saved to database');
+            }
+        } catch (e) {
+            console.error('Error saving session:', e.message);
+        }
+    }
+}
+
+// ============================================
 // WEB PUSH CONFIG
 // ============================================
 webpush.setVapidDetails(
@@ -73,6 +124,11 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
+
+// Initialize session store after supabase is ready
+if (supabase) {
+    initSessionStore();
+}
 
 const app = express();
 app.use(cors());
@@ -222,9 +278,21 @@ app.post('/api/settings', async (req, res) => {
 const otpStore = {};  // phone -> { otp, expiresAt }
 let waReady = false;
 let latestQR = null;
+let whatsappSessionStore = null;
+
+// Initialize session store (after supabase is initialized)
+function initSessionStore() {
+    if (supabase) {
+        whatsappSessionStore = new SupabaseSessionStore(supabase);
+        console.log('📱 WhatsApp session store initialized');
+    }
+}
 
 const waClient = new Client({
-    authStrategy: new LocalAuth(),
+    authStrategy: new LocalAuth({
+        clientId: 'smartparkk-whatsapp',
+        dataPath: './.wwebjs_auth'
+    }),
     puppeteer: {
         args: [
             '--no-sandbox',
@@ -241,6 +309,13 @@ const waClient = new Client({
     }
 });
 
+waClient.on('authenticated', async (session) => {
+    console.log('  ✓  WhatsApp authenticated. Saving session to database...');
+    if (whatsappSessionStore) {
+        await whatsappSessionStore.write(session);
+    }
+});
+
 waClient.on('qr', (qr) => {
     latestQR = qr;
     console.log('\n  [WhatsApp] Scan this QR code with your WhatsApp:');
@@ -252,12 +327,8 @@ waClient.on('qr', (qr) => {
 
 waClient.on('ready', () => {
     waReady = true;
-    latestQR = null; // Clear QR when connected
+    latestQR = null;
     console.log('\n  ✓  WhatsApp connected! OTPs will be sent via WhatsApp.\n');
-});
-
-waClient.on('authenticated', () => {
-    console.log('  ✓  WhatsApp authenticated.');
 });
 
 waClient.on('auth_failure', (msg) => {
@@ -266,7 +337,7 @@ waClient.on('auth_failure', (msg) => {
 
 waClient.on('disconnected', () => {
     waReady = false;
-    console.warn('  ⚠  WhatsApp disconnected. Restart server to reconnect.');
+    console.warn('  ⚠  WhatsApp disconnected. Will try to restore session...');
 });
 
 // ── WhatsApp inbound message handler (EXTEND replies) ───────────────────────
@@ -1064,7 +1135,7 @@ app.delete('/api/blocked-visitors', async (req, res) => {
 // START SERVER
 // ============================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`\n  SmartParkk Server running at:`);
     console.log(`  → Visitor:  http://localhost:${PORT}`);
     console.log(`  → Resident: http://localhost:${PORT}/resident`);
@@ -1072,7 +1143,21 @@ app.listen(PORT, () => {
     console.log(`  ✓  Database: Supabase (Cloud)\n`);
 
     console.log('  ✓  WhatsApp OTP mode active.');
-    console.log('  ➤  Initialising WhatsApp... scan the QR code below when it appears.\n');
+    
+    // Try to restore session from database
+    if (whatsappSessionStore) {
+        try {
+            const savedSession = await whatsappSessionStore.read();
+            if (savedSession) {
+                console.log('  ✓  WhatsApp session found in database, restoring...');
+            } else {
+                console.log('  ➤  No saved session. Scan the QR code when it appears.\n');
+            }
+        } catch (e) {
+            console.log('  ➤  No saved session. Scan the QR code when it appears.\n');
+        }
+    }
+    
     waClient.initialize();
 });
 
