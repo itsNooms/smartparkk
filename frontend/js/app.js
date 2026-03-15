@@ -478,7 +478,7 @@ async function continuousScan(videoId, callback, timeoutMs) {
                 isScanning = false;
                 overlay.style.display = 'block';
                 overlay.textContent = visitorData.licensePlate;
-                statusMsg.textContent = "✅ Plate Matched! Validating...";
+                statusMsg.textContent = "Scanning your license plate...";
 
                 setTimeout(() => {
                     container.classList.remove('scanning');
