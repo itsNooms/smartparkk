@@ -323,8 +323,8 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             stopAdminCamera();
             switchTab(tabDashboard, viewDashboard);
-            startDashboardCamera();
             startGateMonitors();
+            adminGateContinuousScan();
         });
 
         tabGate.addEventListener('click', (e) => {
@@ -1525,30 +1525,30 @@ function adminFuzzyMatch(a, b) {
     return diffs <= 2;
 }
 
-async function startDashboardCamera() {
-    if (_activeStreams['monitor']) return;
-    const video = document.getElementById('dash-cctv-video');
+async function startAdminGateCamera() {
+    if (_activeStreams['gate']) return;
+    const video = document.getElementById('gate-camera-feed');
+    const statusMsg = document.getElementById('gate-camera-status');
     if (!video) return;
+    statusMsg.textContent = "Requesting gate camera...";
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { exact: 'environment' } }
         });
-        _activeStreams['monitor'] = stream;
+        _activeStreams['gate'] = stream;
         video.srcObject = stream;
-        document.getElementById('dash-cctv-status').textContent = 'Live';
     } catch (e) {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            _activeStreams['monitor'] = stream;
+            _activeStreams['gate'] = stream;
             video.srcObject = stream;
-            document.getElementById('dash-cctv-status').textContent = 'Live';
         } catch (err) {
-            document.getElementById('dash-cctv-status').textContent = 'Camera Error';
+            statusMsg.textContent = "Camera access denied.";
             return;
         }
     }
-    startDashboardScan();
+    adminGateContinuousScan();
 }
 
 function stopAdminCamera() {
@@ -1561,8 +1561,39 @@ function stopAdminCamera() {
     adminGateIsScanning = false;
 }
 
-// Dashboard camera continuous scan
-async function startDashboardScan() {
+// Gate Control Monitors (CCTV)
+async function startGateMonitors() {
+    const gateCctvVid = document.getElementById('gate-cctv-video');
+    const dashCctvVid = document.getElementById('dash-cctv-video');
+    const gateStatus = document.getElementById('gate-cctv-status');
+    const dashStatus = document.getElementById('dash-cctv-status');
+
+
+    if (!_activeStreams['monitor'] && (gateCctvVid || dashCctvVid)) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            _activeStreams['monitor'] = stream;
+            if (gateCctvVid) gateCctvVid.srcObject = stream;
+            if (dashCctvVid) dashCctvVid.srcObject = stream;
+
+            if (gateStatus) gateStatus.textContent = "Live Gate Stream";
+            if (dashStatus) dashStatus.textContent = "Live";
+        } catch (e) {
+            if (gateStatus) gateStatus.textContent = "Camera Error";
+            if (dashStatus) dashStatus.textContent = "Error";
+        }
+    } else if (_activeStreams['monitor']) {
+        if (gateCctvVid) gateCctvVid.srcObject = _activeStreams['monitor'];
+        if (dashCctvVid) dashCctvVid.srcObject = _activeStreams['monitor'];
+    }
+
+    // Start Exit feed
+
+}
+
+// (Camera remains running in the background when changing tabs)
+
+async function adminGateContinuousScan() {
     const video = document.getElementById('dash-cctv-video');
     const canvas = document.getElementById('dash-snapshot-canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -1579,7 +1610,7 @@ async function startDashboardScan() {
 
     if (!adminTesseractWorker) {
         statusMsg.textContent = "OCR engine loading...";
-        setTimeout(startDashboardScan, 2000);
+        setTimeout(adminGateContinuousScan, 2000);
         return;
     }
 
@@ -1641,220 +1672,12 @@ async function startDashboardScan() {
                         exitWrap.style.display = 'none';
                         overlay.style.display = 'none';
                         statusMsg.textContent = `Resuming scan...`;
-                        startDashboardScan();
+                        adminGateContinuousScan();
                     }, 6000);
                     break;
                 }
 
                 // 2. Check for ENTRY (if plate is in approved visitor requests)
-                let matchedRequest = null;
-                try {
-                    const reqRes = await fetch('/api/visitor-requests');
-                    const requests = await reqRes.json();
-                    matchedRequest = (requests || []).find(r => r.status === 'approved' && adminFuzzyMatch(normaliseAdminOCR(r.licensePlate), cleanText));
-                } catch (e) { }
-
-                if (matchedRequest) {
-                    statusMsg.textContent = `✅ Plate matched! Triggering admin notification...`;
-                    entryText.textContent = `${matchedRequest.visitorName} visiting ${matchedRequest.visitingFlatId}`;
-
-                    // Trigger gate notification immediately when plate is validated
-                    const triggerRes = await fetch('/api/gate-notifications/trigger', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            requestId: matchedRequest.id,
-                            visitorName: matchedRequest.visitorName,
-                            licensePlate: matchedRequest.licensePlate,
-                            isManual: false
-                        })
-                    });
-                    const triggerData = await triggerRes.json();
-
-                    if (triggerData.success) {
-                        statusMsg.textContent = `✅ Notification sent to admin!`;
-                        entryWrap.style.display = 'block';
-
-                        entryBtn.onclick = async () => {
-                            // Dismiss the notification to open the gate
-                            await fetch('/api/gate-notifications/dismiss', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: triggerData.notificationId })
-                            });
-                            
-                            // Also add visitor to the visitors table with entry time
-                            const entryRes = await fetch('/api/visitors', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    id: Date.now().toString(),
-                                    name: matchedRequest.visitorName,
-                                    phone: matchedRequest.visitorPhone,
-                                    licensePlate: matchedRequest.licensePlate,
-                                    visitingFlat: matchedRequest.visitingFlatId,
-                                    entryTime: new Date().toISOString()
-                                })
-                            });
-                            
-                            entryWrap.style.display = 'none';
-                            overlay.style.display = 'none';
-                            statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Entry recorded!`;
-                            adminGateIsScanning = false;
-                            setTimeout(startDashboardScan, 3000);
-                        };
-                    } else {
-                        statusMsg.textContent = `⚠️ Failed to notify admin: ${triggerData.message || 'Unknown error'}`;
-                        setTimeout(startDashboardScan, 3000);
-                    }
-                    break;
-                }
-
-                // 3. If not found in either, show message
-                statusMsg.textContent = `❌ Plate not found in system`;
-                setTimeout(startDashboardScan, 3000);
-                break;
-            } else {
-                overlay.style.display = 'none';
-                statusMsg.textContent = "Scanning for plates...";
-            }
-                    break;
-                }
-
-                // 2. Check for EXIT
-                let matchedVisitor = null;
-                try {
-                    const visRes = await fetch('/api/visitors');
-                    const visitors = await visRes.json();
-                    matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate), cleanText));
-                } catch (e) { }
-
-                if (matchedVisitor) {
-                    statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
-
-                    const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
-                    const entryMs = new Date(matchedVisitor.entryTime).getTime();
-                    const diffHrs = (Date.now() - entryMs) / 3600000;
-                    const FINE_AMOUNT = getFineAmount();
-                    const totalCharge = (Math.max(diffHrs * parseFloat(savedRate), 0)) + (Date.now() - entryMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
-
-                    await fetch('/api/visitors/update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            id: matchedVisitor.id,
-                            exitTime: new Date().toISOString(),
-                            totalCharge: totalCharge
-                        })
-                    });
-
-                    statusMsg.textContent = `🚗 Vehicle exit processed: ${cleanText}`;
-                    exitPlateText.textContent = `Plate: ${cleanText}`;
-                    exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
-                    exitWrap.style.display = 'block';
-
-                    setTimeout(() => {
-                        exitWrap.style.display = 'none';
-                        overlay.style.display = 'none';
-                        statusMsg.textContent = `Resuming scan...`;
-                        startDashboardScan();
-                    }, 6000);
-                    break;
-                }
-            } else {
-                overlay.style.display = 'none';
-                statusMsg.textContent = "Scanning for plates...";
-            }
-        } catch (err) { console.warn(err); }
-    }
-}
-
-function stopAdminCamera() {
-    Object.keys(_activeStreams).forEach(key => {
-        if (_activeStreams[key]) {
-            _activeStreams[key].getTracks().forEach(t => t.stop());
-            delete _activeStreams[key];
-        }
-    });
-    adminGateIsScanning = false;
-}
-
-// Gate Control Monitors (CCTV)
-async function startGateMonitors() {
-    const gateCctvVid = document.getElementById('gate-cctv-video');
-    const dashCctvVid = document.getElementById('dash-cctv-video');
-    const gateStatus = document.getElementById('gate-cctv-status');
-    const dashStatus = document.getElementById('dash-cctv-status');
-
-
-    if (!_activeStreams['monitor'] && (gateCctvVid || dashCctvVid)) {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            _activeStreams['monitor'] = stream;
-            if (gateCctvVid) gateCctvVid.srcObject = stream;
-            if (dashCctvVid) dashCctvVid.srcObject = stream;
-
-            if (gateStatus) gateStatus.textContent = "Live Gate Stream";
-            if (dashStatus) dashStatus.textContent = "Live";
-        } catch (e) {
-            if (gateStatus) gateStatus.textContent = "Camera Error";
-            if (dashStatus) dashStatus.textContent = "Error";
-        }
-    } else if (_activeStreams['monitor']) {
-        if (gateCctvVid) gateCctvVid.srcObject = _activeStreams['monitor'];
-        if (dashCctvVid) dashCctvVid.srcObject = _activeStreams['monitor'];
-    }
-
-    // Start Exit feed
-
-}
-
-// (Camera remains running in the background when changing tabs)
-
-async function adminGateContinuousScan() {
-    const video = document.getElementById('gate-camera-feed');
-    const canvas = document.getElementById('gate-snapshot-canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const statusMsg = document.getElementById('gate-camera-status');
-    const overlay = document.getElementById('detected-plate-admin-gate');
-
-    const entryWrap = document.getElementById('gate-match-entry-result');
-    const entryText = document.getElementById('gate-match-entry-text');
-    const entryBtn = document.getElementById('btn-gate-open-entry');
-
-    const exitWrap = document.getElementById('gate-match-exit-result');
-    const exitPlateText = document.getElementById('gate-match-exit-plate');
-    const exitChargeText = document.getElementById('gate-match-exit-charge');
-
-    if (!adminTesseractWorker) {
-        statusMsg.textContent = "OCR engine missing or loading...";
-        setTimeout(adminGateContinuousScan, 2000);
-        return;
-    }
-
-    adminGateIsScanning = true;
-    statusMsg.textContent = "Auto-monitoring entrance & exit...";
-
-    while (adminGateIsScanning) {
-        await new Promise(r => setTimeout(r, 800));
-        if (!adminGateIsScanning) break;
-        if (video.readyState !== video.HAVE_ENOUGH_DATA) continue;
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        try {
-            const processed = preprocessAdminPlate(canvas);
-            const tRes = await adminTesseractWorker.recognize(processed);
-            const cleanText = normaliseAdminOCR(tRes.data.text);
-
-            if (cleanText.length >= 4) {
-                overlay.textContent = cleanText;
-                overlay.style.display = 'block';
-                statusMsg.textContent = `Scanning plate: ${cleanText}...`;
-
-                // 1. Check for ENTRY
                 let matchedRequest = null;
                 try {
                     const reqRes = await fetch('/api/visitor-requests');
@@ -1918,55 +1741,14 @@ async function adminGateContinuousScan() {
                     break;
                 }
 
-                // 2. Check for EXIT
-                let matchedVisitor = null;
-                try {
-                    const visRes = await fetch('/api/visitors');
-                    const visitors = await visRes.json();
-                    matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate), cleanText));
-                } catch (e) { }
-
-                if (matchedVisitor) {
-                    adminGateIsScanning = false;
-                    statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
-
-                    const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
-                    const entryMs = new Date(matchedVisitor.entryTime).getTime();
-                    const diffHrs = (Date.now() - entryMs) / 3600000;
-                    const FINE_AMOUNT = getFineAmount();
-                    const totalCharge = (Math.max(diffHrs * parseFloat(savedRate), 0)) + (Date.now() - entryMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
-
-                    await fetch('/api/visitors/update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            id: matchedVisitor.id,
-                            exitTime: new Date().toISOString(),
-                            totalCharge: totalCharge
-                        })
-                    });
-
-                    statusMsg.textContent = `🚗 Vehicle exit processed: ${cleanText}`;
-                    exitPlateText.textContent = `Plate: ${cleanText}`;
-                    exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
-                    exitWrap.style.display = 'block';
-
-                    setTimeout(() => {
-                        exitWrap.style.display = 'none';
-                        overlay.style.display = 'none';
-                        statusMsg.textContent = `Resuming...`;
-                        adminGateContinuousScan();
-                    }, 6000);
-                    break;
-                }
+                // 3. If not found in either, show message
+                statusMsg.textContent = `❌ Plate not found in system`;
+                setTimeout(adminGateContinuousScan, 3000);
+                break;
             } else {
                 overlay.style.display = 'none';
-                statusMsg.textContent = "Auto-monitoring entrance & exit...";
+                statusMsg.textContent = "Scanning for plates...";
             }
         } catch (err) { console.warn(err); }
     }
 }
-
-// ============================================
-// SETTINGS EDITING
-// ============================================
