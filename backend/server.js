@@ -650,12 +650,11 @@ app.post('/api/subscribe', (req, res) => {
 app.get('/api/visitor-requests', async (req, res) => {
     const flatId = req.query.flatId;
 
+    // Always get ALL requests, then filter in JS for base flat matching
     let query = supabase.from('visitor_requests').select('*');
-
-    if (flatId) {
-        // Get all pending, then filter in JS for base flat matching
-        query = query.eq('status', 'pending');
-    }
+    
+    // Sort by most recent first
+    query = query.order('created_at', { ascending: false });
 
     const { data, error } = await query;
     if (error) return res.status(500).json({ success: false, message: error.message });
