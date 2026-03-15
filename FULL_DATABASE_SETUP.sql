@@ -57,6 +57,15 @@ CREATE TABLE IF NOT EXISTS gate_notifications (
     opened_at TIMESTAMPTZ
 );
 
+-- Add opened_at column if it doesn't exist (for existing installations)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name='gate_notifications' AND column_name='opened_at') THEN
+        ALTER TABLE gate_notifications ADD COLUMN opened_at TIMESTAMPTZ;
+    END IF;
+END $$;
+
 -- 5. Blocked Visitors
 CREATE TABLE IF NOT EXISTS blocked_visitors (
     id BIGSERIAL PRIMARY KEY,
