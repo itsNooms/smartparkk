@@ -420,6 +420,14 @@
                     <span id="gate-tab-badge"
                         style="display:none; position:absolute; top:6px; right:8px; background:#ef4444; color:white; font-size:10px; font-weight:700; border-radius:50%; width:16px; height:16px; align-items:center; justify-content:center;"></span>
                 </a>
+                <a href="#" class="nav-item" id="tab-gate-camera">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                        </path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    Gate Camera
+                </a>
                 <a href="#" class="nav-item" id="tab-residents">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -598,6 +606,48 @@
                             style="border-radius:12px; overflow:hidden; background:#000; height:300px; position:relative;">
                             <video id="dash-cctv-video" autoplay playsinline muted
                                 style="width:100%; height:100%; object-fit:cover;"></video>
+                            <div class="monitor-overlay"
+                                style="position:absolute; top:12px; left:12px; background:rgba(0,0,0,0.6); color:#3b82f6; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; display:flex; align-items:center; gap:6px;">
+                                <span
+                                    style="width:8px; height:8px; border-radius:50%; background:#3b82f6; box-shadow:0 0 8px #3b82f6;"></span>
+                                LIVE FEED
+                            </div>
+                            <div class="scanner-guide"
+                                style="position:absolute; inset:0; border:2px dashed rgba(59,130,246,0.5); margin:40px; border-radius:12px; pointer-events:none; display:flex; align-items:center; justify-content:center;">
+                                <span
+                                    style="color:rgba(255,255,255,0.4); font-size:12px; text-transform:uppercase; letter-spacing:1px;">Align
+                                    plate here</span>
+                            </div>
+                            <div class="scanner-line"
+                                style="position:absolute; top:40px; left:40px; right:40px; height:2px; background:rgba(59,130,246,0.6); box-shadow:0 0 15px #3b82f6; animation: scannerMove 3s infinite linear;">
+                            </div>
+                            <div class="plate-overlay" id="detected-plate-dashboard"
+                                style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); color:white; padding:10px 20px; border-radius:10px; border:2px solid #3b82f6; font-size:18px; font-weight:800; z-index:10; font-family:monospace; letter-spacing: 1px;">
+                                Scanning...</div>
+                        </div>
+                        <canvas id="dash-snapshot-canvas" style="display: none;"></canvas>
+
+                        <div id="dash-match-entry-result"
+                            style="display:none; margin-top: 20px; padding: 15px; background: rgba(16, 185, 129, 0.15); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.4); text-align: center; animation: slideUp 0.3s ease;">
+                            <div
+                                style="color: #10b981; font-weight: 700; font-size: 13px; margin-bottom: 8px; text-transform: uppercase;">
+                                ✅ Approved Entry</div>
+                            <p style="color: var(--text-main); font-weight: 500; font-size: 14px; margin-bottom: 10px;"
+                                id="dash-match-entry-text"></p>
+                            <button id="btn-dash-open-entry" class="btn btn-primary"
+                                style="width: 100%; padding: 10px; font-size: 14px;">Open Gate</button>
+                        </div>
+
+                        <div id="dash-match-exit-result"
+                            style="display:none; margin-top: 20px; padding: 15px; background: rgba(59, 130, 246, 0.15); border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.4); text-align: center; animation: slideUp 0.3s ease;">
+                            <div
+                                style="color: #3b82f6; font-weight: 700; font-size: 13px; margin-bottom: 8px; text-transform: uppercase;">
+                                🚗 Vehicle Exit</div>
+                            <p style="color: var(--text-main); font-weight: 500; font-size: 14px; margin-bottom: 4px;"
+                                id="dash-match-exit-plate"></p>
+                            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 8px;"
+                                id="dash-match-exit-charge"></p>
+                            <div style="color: #60a5fa; font-weight: 600; font-size: 12px;">Gate auto-opening...</div>
                         </div>
                     </div>
                 </div>
@@ -1076,6 +1126,32 @@
         .gate-alert.new-flash {
             animation: gateSlideIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both,
                 gatePulseRing 1.8s ease-in-out 0.5s infinite;
+        }
+
+        @keyframes scannerMove {
+            0% {
+                top: 40px;
+            }
+
+            50% {
+                top: 250px;
+            }
+
+            100% {
+                top: 40px;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 
