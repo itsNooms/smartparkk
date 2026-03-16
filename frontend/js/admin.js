@@ -95,7 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.success) {
                 sessionStorage.setItem('smartpark_admin_auth', 'true');
-                sessionStorage.setItem('smartpark_admin_id', data.admin.id);
                 sessionStorage.setItem('smartpark_admin_time', Date.now().toString());
                 showDashboard();
             } else {
@@ -362,10 +361,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dashboardInitialized) return;
         dashboardInitialized = true;
 
-        const adminId = sessionStorage.getItem('smartpark_admin_id');
-
         // Load saved settings from backend (sync across devices)
-        fetch(`/api/settings?adminId=${adminId}`)
+        fetch('/api/settings')
             .then(res => res.json())
             .then(settings => {
                 settings.forEach(s => {
@@ -523,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId: sessionStorage.getItem('smartpark_admin_id'), key: 'smartpark_total_parking', value: val.toString() })
+                    body: JSON.stringify({ key: 'smartpark_total_parking', value: val.toString() })
                 }).catch(err => console.error('[SETTINGS] Save error:', err));
             }
             totalDisplay.style.display = 'inline';
@@ -575,7 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId: sessionStorage.getItem('smartpark_admin_id'), key: 'smartpark_rate_per_hour', value: val.toString() })
+                    body: JSON.stringify({ key: 'smartpark_rate_per_hour', value: val.toString() })
                 }).catch(err => console.error('[SETTINGS] Save error:', err));
             }
             rateDisplay.style.display = 'inline';
@@ -626,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId: sessionStorage.getItem('smartpark_admin_id'), key: 'smartpark_fine_amount', value: val.toString() })
+                    body: JSON.stringify({ key: 'smartpark_fine_amount', value: val.toString() })
                 }).catch(err => console.error('[SETTINGS] Save error:', err));
             }
             fineDisplay.style.display = 'inline';
@@ -667,8 +664,7 @@ function updateParkingStats(activeCount) {
 
 async function loadTableData() {
     try {
-        const adminId = sessionStorage.getItem('smartpark_admin_id');
-        const res = await fetch(`/api/visitors?adminId=${adminId}`);
+        const res = await fetch('/api/visitors');
         const entries = await res.json();
 
         const logsBody = document.getElementById('logs-body');
@@ -805,8 +801,7 @@ async function loadTableData() {
 
 async function loadResidentsData() {
     try {
-        const adminId = sessionStorage.getItem('smartpark_admin_id');
-        const res = await fetch(`/api/residents?adminId=${adminId}`);
+        const res = await fetch('/api/residents');
         const residents = await res.json();
 
         const residentsBody = document.getElementById('residents-body');
@@ -876,20 +871,15 @@ function saveNotifState() {
 
 let _isPollingGateNotifs = false;
 
-// Poll Gate Notifications
 async function pollGateNotifications() {
+    if (_isPollingGateNotifs) return;
+    // Only run if dashboard is visible (admin is logged in)
+    const dashboard = document.getElementById('admin-dashboard');
+    if (!dashboard || !dashboard.classList.contains('active')) return;
+
+    _isPollingGateNotifs = true;
     try {
-        const adminId = sessionStorage.getItem('smartpark_admin_id');
-        if (!adminId) return;
-
-        // Only run if dashboard is visible (admin is logged in)
-        const dashboard = document.getElementById('admin-dashboard');
-        if (!dashboard || !dashboard.classList.contains('active')) return;
-
-        if (_isPollingGateNotifs) return;
-        _isPollingGateNotifs = true;
-
-        const res = await fetch(`/api/gate-notifications?adminId=${adminId}`);
+        const res = await fetch('/api/gate-notifications');
         if (!res.ok) return;
         const notifications = await res.json();
 
@@ -1370,8 +1360,7 @@ async function renderParkingLot() {
     // Fetch currently active visitors (no exitTime)
     let activeVisitors = [];
     try {
-        const adminId = sessionStorage.getItem('smartpark_admin_id');
-        const res = await fetch(`/api/visitors?adminId=${adminId}`);
+        const res = await fetch('/api/visitors');
         const all = await res.json();
         const now = Date.now();
         const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -1469,8 +1458,7 @@ let _allBlockedVisitors = [];
 
 async function loadBlockedVisitors() {
     try {
-        const adminId = sessionStorage.getItem('smartpark_admin_id');
-        const res = await fetch(`/api/blocked-visitors/all?adminId=${adminId}`);
+        const res = await fetch('/api/blocked-visitors/all');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         _allBlockedVisitors = await res.json();
     } catch (err) {
@@ -1549,11 +1537,10 @@ async function adminUnblockVisitor(residentFlatId, visitorPhone, btnEl) {
     }
 
     try {
-        const adminId = sessionStorage.getItem('smartpark_admin_id');
         const res = await fetch('/api/blocked-visitors', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ residentFlatId, visitorPhone, adminId })
+            body: JSON.stringify({ residentFlatId, visitorPhone })
         });
         const data = await res.json();
         if (data.success) {
