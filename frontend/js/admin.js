@@ -75,21 +75,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const loginError = document.getElementById('login-error');
 
-    function getAdminCreds() {
-        const stored = localStorage.getItem('smartpark_admin_creds');
-        return stored ? JSON.parse(stored) : { username: 'admin', password: 'admin123' };
-    }
-
     loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
 
         const user = document.getElementById('username').value.trim();
         const pass = document.getElementById('password').value;
-        const adminCreds = getAdminCreds();
 
-        console.log('Login attempt:', user, '| Stored creds:', adminCreds);
-
-        if (user === adminCreds.username && pass === adminCreds.password) {
+        // Hardcoded demo credentials
+        if (user === 'admin' && pass === 'admin123') {
             sessionStorage.setItem('smartpark_admin_auth', 'true');
             sessionStorage.setItem('smartpark_admin_time', Date.now().toString());
             showDashboard();
@@ -252,11 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         resetError.style.display = 'none';
-
-        // Store credentials in localStorage
-        localStorage.setItem('smartpark_admin_creds', JSON.stringify({ username: 'admin', password: newPass }));
-        console.log('Password reset to:', newPass);
-        alert("Password reset successfully! Use your new password to login.");
+        alert("Password reset successfully!");
         showAuthScreen('screen-login');
     });
 
@@ -370,45 +359,6 @@ document.addEventListener('DOMContentLoaded', () => {
             switchTab(tabBlocked, viewBlocked);
             stopAdminCamera();
             loadBlockedVisitors();
-        });
-
-        // Change Password Modal
-        const changePassModal = document.getElementById('change-password-modal');
-        const cpNewPass = document.getElementById('cp-new-pass');
-        const cpConfirmPass = document.getElementById('cp-confirm-pass');
-        const cpError = document.getElementById('cp-error');
-        
-        document.getElementById('change-password-btn').addEventListener('click', (e) => {
-            e.preventDefault();
-            cpNewPass.value = '';
-            cpConfirmPass.value = '';
-            cpError.style.display = 'none';
-            changePassModal.style.display = 'flex';
-        });
-
-        document.getElementById('cp-cancel-btn').addEventListener('click', () => {
-            changePassModal.style.display = 'none';
-        });
-
-        document.getElementById('cp-save-btn').addEventListener('click', () => {
-            const newPass = cpNewPass.value;
-            const confirmPass = cpConfirmPass.value;
-
-            if (newPass.length < 6) {
-                cpError.textContent = 'Password must be at least 6 characters';
-                cpError.style.display = 'block';
-                return;
-            }
-
-            if (newPass !== confirmPass) {
-                cpError.textContent = 'Passwords do not match';
-                cpError.style.display = 'block';
-                return;
-            }
-
-            localStorage.setItem('smartpark_admin_creds', JSON.stringify({ username: 'admin', password: newPass }));
-            changePassModal.style.display = 'none';
-            alert('Password changed successfully!');
         });
 
         // Logout
