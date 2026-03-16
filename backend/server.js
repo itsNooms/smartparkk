@@ -245,6 +245,62 @@ app.get('/api/settings', async (req, res) => {
     }
 });
 
+// ============================================
+// ADMIN AUTH API (SUPABASE)
+// ============================================
+
+// Register an admin
+app.post('/api/admin/register', async (req, res) => {
+    const { username, password, phone } = req.body;
+    if (!username || !password || !phone) {
+        return res.status(400).json({ success: false, message: 'Username, password, and phone are required' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('admins')
+            .insert([{ username, password, phone }])
+            .select();
+
+        if (error) {
+            if (error.code === '23505') {
+                return res.status(400).json({ success: false, message: 'Username already exists' });
+            }
+            return res.status(500).json({ success: false, message: error.message });
+        }
+        res.json({ success: true, admin: { username: data[0].username } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Admin login
+app.post('/api/admin/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    // Backward compatibility for hardcoded demo account
+    if (username === 'admin' && password === 'Admin@123') {
+        return res.json({ success: true, admin: { username: 'admin' } });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('admins')
+            .select('*')
+            .eq('username', username)
+            .eq('password', password) // In a real app, use hashed passwords!
+            .single();
+
+        if (error || !data) {
+            return res.status(401).json({ success: false, message: 'Invalid username or password' });
+        }
+
+        res.json({ success: true, admin: { username: data.username, email: data.email } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // Update or create a setting
 app.post('/api/settings', async (req, res) => {
     const { key, value } = req.body;
@@ -559,7 +615,7 @@ app.get('/api/visitors', async (req, res) => {
 // Add a visitor (entry)
 app.post('/api/visitors', async (req, res) => {
     const b = req.body;
-    
+
     // Check if this plate is already in the system (no exit_time)
     const { data: existingVisitor } = await supabase
         .from('visitors')
@@ -569,12 +625,12 @@ app.post('/api/visitors', async (req, res) => {
         .limit(1);
 
     if (existingVisitor && existingVisitor.length > 0) {
-        return res.status(400).json({ 
-            success: false, 
-            message: `Vehicle with plate ${b.licensePlate} is already parked. Please scan again to exit.` 
+        return res.status(400).json({
+            success: false,
+            message: `Vehicle with plate ${b.licensePlate} is already parked. Please scan again to exit.`
         });
     }
-    
+
     const { data, error } = await supabase.from('visitors').insert([{
         id: b.id || Date.now().toString(),
         name: b.name,
@@ -732,12 +788,12 @@ app.get('/api/visitor-requests', async (req, res) => {
 
     // Always get ALL requests, then filter in JS for base flat matching
     let query = supabase.from('visitor_requests').select('*');
-    
+
     // If status is specified, filter by it
     if (status) {
         query = query.eq('status', status);
     }
-    
+
     // Sort by most recent first
     query = query.order('created_at', { ascending: false });
 
@@ -782,9 +838,9 @@ app.post('/api/visitor-requests/respond', async (req, res) => {
     console.log(`[REQUEST] Visitor request ${requestId} was ${action}`);
 
     const request = data[0];
-    
-    res.json({ 
-        success: true, 
+
+    res.json({
+        success: true,
         request: {
             id: request.id,
             visitorName: request.visitor_name,
@@ -1121,12 +1177,12 @@ app.listen(PORT, async () => {
     console.log(`  ✓  Database: Supabase (Cloud)\n`);
 
     console.log('  ✓  WhatsApp OTP mode active.');
-    
+
     // Initialize session store after supabase is ready
     if (supabase) {
         whatsappSessionStore = new SupabaseSessionStore(supabase);
         console.log('📱 WhatsApp session store initialized');
-        
+
         // Try to restore session from database
         try {
             const savedSession = await whatsappSessionStore.read();
@@ -1141,7 +1197,7 @@ app.listen(PORT, async () => {
     } else {
         console.log('  ➤  No Supabase connection. Using local session only.\n');
     }
-    
+
     waClient.initialize();
 });
 
