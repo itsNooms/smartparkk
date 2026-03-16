@@ -75,6 +75,99 @@
             margin-bottom: 8px;
         }
 
+        /* ===== PASSWORD INPUT WITH TOGGLE ===== */
+        .password-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group input[type="password"],
+        .input-group input[type="text"].password-visible {
+            width: 100%;
+            padding: 14px 16px;
+            padding-right: 45px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .input-group input[type="password"]:focus,
+        .input-group input[type="text"].password-visible:focus {
+            border-color: var(--primary);
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 14px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 6px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            font-size: 18px;
+        }
+
+        .password-toggle-btn:hover {
+            color: var(--primary);
+        }
+
+        /* Password Requirements Box */
+        .password-requirements {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        .requirement-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+        }
+
+        .requirement-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .requirement-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .requirement-icon.unchecked {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+        }
+
+        .requirement-icon.checked {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .requirement-text.checked {
+            color: #10b981;
+        }
+
         .input-group input {
             width: 100%;
             padding: 14px 16px;
@@ -111,8 +204,14 @@
             color: white;
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             background: var(--primary-hover);
+        }
+
+        .btn-primary:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            opacity: 0.5;
         }
 
         .btn-text {
@@ -200,7 +299,12 @@
                 </div>
                 <div class="input-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" required placeholder="Enter password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="password" required placeholder="Enter password">
+                        <button type="button" class="password-toggle-btn" id="password-toggle" title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
                 </div>
                 <!-- Forgot Password Link -->
                 <div style="text-align: right; margin-bottom: 15px;">
@@ -270,16 +374,40 @@
             <form id="reset-form">
                 <div class="input-group">
                     <label for="new-password">New Password</label>
-                    <input type="password" id="new-password" required placeholder="Enter new password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="new-password" required placeholder="Enter new password">
+                        <button type="button" class="password-toggle-btn" id="new-password-toggle" title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
+                    <div class="password-requirements">
+                        <div class="requirement-item">
+                            <span class="requirement-icon unchecked" id="req-length-icon">✓</span>
+                            <span class="requirement-text" id="req-length">Minimum 8 characters</span>
+                        </div>
+                        <div class="requirement-item">
+                            <span class="requirement-icon unchecked" id="req-uppercase-icon">✓</span>
+                            <span class="requirement-text" id="req-uppercase">At least one uppercase letter (A-Z)</span>
+                        </div>
+                        <div class="requirement-item">
+                            <span class="requirement-icon unchecked" id="req-special-icon">✓</span>
+                            <span class="requirement-text" id="req-special">At least one special character (!@#$%^&*)</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="input-group">
                     <label for="confirm-password">Confirm Password</label>
-                    <input type="password" id="confirm-password" required placeholder="Confirm new password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="confirm-password" required placeholder="Confirm new password">
+                        <button type="button" class="password-toggle-btn" id="confirm-password-toggle" title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
                 </div>
                 <div class="status-msg" id="reset-error"
                     style="color: var(--danger); display: none; margin-bottom: 15px; min-height: 0;">Passwords do
                     not match!</div>
-                <button type="submit" class="btn btn-primary">Save Password</button>
+                <button type="submit" class="btn btn-primary" id="reset-submit-btn">Save Password</button>
                 <button type="button" class="btn btn-text" id="reset-back-login">Cancel</button>
             </form>
         </div>
@@ -357,50 +485,6 @@
         </aside>
 
         <main class="main-content">
-            <!-- Gate Control View -->
-            <div id="gate-view" class="view-section" style="display: none;">
-                <header class="top-nav">
-                    <div>
-                        <h1>Gate Control</h1>
-                        <p class="subtitle">Manually open the gate for approved visitors</p>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <span id="gate-view-live-dot"
-                            style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 0 0 rgba(16,185,129,0.5);animation:gateLivePulse 2s infinite;"></span>
-                        <span style="color:var(--text-muted);font-size:13px;">Live — updates every 3s</span>
-                    </div>
-                </header>
-
-                <div class="gate-monitors" style="margin-bottom: 24px;">
-                    <div class="monitor-box"
-                        style="background:rgba(15,23,42,0.4); border:1px solid var(--border); border-radius:12px; overflow:hidden; position:relative; max-width: 600px; margin: 0 auto;">
-                        <video id="gate-cctv-video" autoplay playsinline muted
-                            style="width:100%; height:240px; object-fit:cover; display:block; filter:grayscale(0.3) contrast(1.1);"></video>
-                        <div
-                            style="position:absolute; top:12px; left:12px; background:rgba(0,0,0,0.6); color:#3b82f6; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; display:flex; align-items:center; gap:6px;">
-                            <span
-                                style="width:8px; height:8px; border-radius:50%; background:#3b82f6; box-shadow:0 0 8px #3b82f6;"></span>
-                            MAIN GATE CCTV
-                        </div>
-                        <div id="gate-cctv-status"
-                            style="position:absolute; bottom:12px; left:12px; color:white; font-size:12px; text-shadow:0 1px 2px rgba(0,0,0,0.8);">
-                            Initializing...</div>
-                    </div>
-                </div>
-
-                <div id="gate-view-empty"
-                    style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 20px; color:var(--text-muted); text-align:center;">
-                    <div style="font-size:52px; margin-bottom:16px;">🔒</div>
-                    <p style="font-size:18px; font-weight:600; color:var(--text-main); margin-bottom:8px;">No pending
-                        gate requests</p>
-                    <p style="font-size:14px;">When a resident approves a visitor, the gate request will appear here.
-                    </p>
-                </div>
-
-                <div id="gate-cards-container" style="display:flex; flex-direction:column; gap:16px; padding: 4px 0;">
-                </div>
-            </div>
-
             <!-- Dashboard View -->
             <div id="dashboard-view" class="view-section">
                 <header class="top-nav">
@@ -408,568 +492,141 @@
                         <h1>Visitor Logs</h1>
                         <p class="subtitle">Real-time gate tracking</p>
                     </div>
-                    <!-- Mini Stats -->
-                    <div class="quick-stats">
-                        <div class="stat-badge">
-                            <span class="dot active-dot"></span> <span id="active-count">0</span> Active
-                        </div>
-                    </div>
                 </header>
-
-                <!-- Stats Cards -->
-                <div class="stats-row">
-                    <div class="stat-card">
-                        <div class="stat-label">Total Parking</div>
-                        <div class="stat-value">
-                            <span id="total-parking-display" class="editable-stat" title="Click to edit">50</span>
-                            <input type="number" id="total-parking-input" class="stat-edit-input" value="50" min="1"
-                                style="display:none;">
-                            <button id="edit-total-btn" class="stat-edit-btn" title="Edit">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Hourly Rate (₹)</div>
-                        <div class="stat-value">
-                            <span id="rate-parking-display" class="editable-stat" title="Click to edit">5</span>
-                            <input type="number" id="rate-parking-input" class="stat-edit-input" value="5" min="0"
-                                step="1" style="display:none;">
-                            <button id="edit-rate-btn" class="stat-edit-btn" title="Edit">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Fine Amount (₹)</div>
-                        <div class="stat-value">
-                            <span id="fine-amount-display" class="editable-stat" title="Click to edit">50</span>
-                            <input type="number" id="fine-amount-input" class="stat-edit-input" value="50" min="0"
-                                step="1" style="display:none;">
-                            <button id="edit-fine-btn" class="stat-edit-btn" title="Edit">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="stat-card stat-available">
-                        <div class="stat-label">Available</div>
-                        <div class="stat-value"><span id="available-count">50</span></div>
-                    </div>
-                    <div class="stat-card stat-occupied">
-                        <div class="stat-label">Occupied</div>
-                        <div class="stat-value"><span id="occupied-count">0</span></div>
-                    </div>
-                    <div class="stat-card stat-revenue">
-                        <div class="stat-label">Collected (Month)</div>
-                        <div class="stat-value"><span id="revenue-month">₹0</span></div>
-                    </div>
-                </div>
-
-                <div class="dashboard-monitors" style="margin: 24px 0;">
-                    <div class="monitor-card"
-                        style="background:rgba(15,23,42,0.4); border:1px solid var(--border); border-radius:16px; padding:16px; max-width: 800px; margin: 0 auto;">
-                        <div
-                            style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                            <span
-                                style="font-size:14px; font-weight:600; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                                <span
-                                    style="width:10px; height:10px; border-radius:50%; background:#3b82f6; box-shadow:0 0 8px #3b82f6;"></span>
-                                LIVE GATE CAMERA
-                            </span>
-                            <span id="dash-cctv-status" style="font-size:12px; color:var(--text-muted);">Inactive</span>
-                        </div>
-                        <div
-                            style="border-radius:12px; overflow:hidden; background:#000; height:300px; position:relative;">
-                            <video id="dash-cctv-video" autoplay playsinline muted
-                                style="width:100%; height:100%; object-fit:cover;"></video>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Status</th>
-                                <th>Visitor</th>
-                                <th>Phone</th>
-                                <th>License Plate</th>
-                                <th>Visiting</th>
-                                <th>Entry Time</th>
-                                <th>Exit Time</th>
-                                <th>Charge</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logs-body">
-                            <!-- Filled by JS -->
-                        </tbody>
-                    </table>
-                    <div id="empty-state" class="empty-state hidden">
-                        <p>No visitor entries found in the system right now.</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Residents View -->
-            <div id="residents-view" class="view-section" style="display: none;">
-                <header class="top-nav">
-                    <div>
-                        <h1>Resident Logs</h1>
-                        <p class="subtitle">Manage residents and tenants</p>
-                    </div>
-                </header>
-
-                <div class="table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Role</th>
-                                <th>Flat ID</th>
-                                <th>Name</th>
-                                <th>Phone</th>
-                                <th>Car Plate</th>
-                                <th>Availability</th>
-                            </tr>
-                        </thead>
-                        <tbody id="residents-body">
-                            <!-- Filled by JS -->
-                        </tbody>
-                    </table>
-                    <div id="empty-state-residents" class="empty-state hidden">
-                        <p>No residents found in the system right now.</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- History View -->
-            <div id="history-view" class="view-section" style="display: none;">
-                <header class="top-nav">
-                    <div>
-                        <h1>History Logs</h1>
-                        <p class="subtitle">Visitor records over the last 3 months</p>
-                    </div>
-                </header>
-
-                <div class="table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Status</th>
-                                <th>Visitor</th>
-                                <th>Phone</th>
-                                <th>License Plate</th>
-                                <th>Visiting</th>
-                                <th>Entry Time</th>
-                                <th>Exit Time</th>
-                                <th>Charge</th>
-                            </tr>
-                        </thead>
-                        <tbody id="history-body">
-                            <!-- Filled by JS -->
-                        </tbody>
-                    </table>
-                    <div id="empty-state-history" class="empty-state hidden">
-                        <p>No historical records found for the last 3 months.</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Parking Lot View -->
-            <div id="parking-lot-view" class="view-section" style="display: none;">
-                <header class="top-nav">
-                    <div>
-                        <h1>Parking Lot</h1>
-                        <p class="subtitle">Live visual layout of all parking spots</p>
-                    </div>
-                    <div class="pl-legend">
-                        <span class="pl-legend-item">
-                            <span class="pl-legend-dot pl-dot-available"></span> Available
-                        </span>
-                        <span class="pl-legend-item">
-                            <span class="pl-legend-dot pl-dot-occupied"></span> Occupied
-                        </span>
-                    </div>
-                </header>
-
-                <!-- Aisle + Grid wrapper -->
-                <div class="pl-wrapper">
-                    <!-- Road/Entrance label -->
-                    <div class="pl-road">
-                        <div class="pl-road-label">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M5 12h14M12 5l7 7-7 7" />
-                            </svg>
-                            ENTRANCE
-                        </div>
-                        <div class="pl-road-dashes"></div>
-                        <div class="pl-road-label" style="justify-content: flex-end;">
-                            EXIT
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M5 12h14M12 5l7 7-7 7" />
-                            </svg>
-                        </div>
-                    </div>
-
-                    <div class="pl-section-label">ROW A</div>
-                    <div class="pl-grid" id="pl-grid-a"></div>
-
-                    <div class="pl-aisle">
-                        <span>← DRIVE LANE →</span>
-                    </div>
-
-                    <div class="pl-section-label">ROW B</div>
-                    <div class="pl-grid" id="pl-grid-b"></div>
-
-                    <div class="pl-aisle">
-                        <span>← DRIVE LANE →</span>
-                    </div>
-
-                    <div class="pl-section-label">ROW C</div>
-                    <div class="pl-grid" id="pl-grid-c"></div>
-                </div>
-            </div>
-
-            <!-- Gate Camera View -->
-            <div id="gate-camera-view" class="view-section" style="display: none;">
-                <header class="top-nav">
-                    <div>
-                        <h1>Gate Camera</h1>
-                        <p class="subtitle">Unified scanning for all incoming and exiting vehicles</p>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <span
-                            style="width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block; box-shadow:0 0 8px #10b981;"></span>
-                        <span style="color:var(--text-muted); font-size:13px;">Auto-detecting entry/exit</span>
-                    </div>
-                </header>
-                <div class="camera-ui-wrap"
-                    style="max-width: 650px; margin: 30px auto; background: rgba(15, 23, 42, 0.4); padding: 25px; border-radius: 20px; border: 1px solid var(--border);">
-                    <div class="camera-container">
-                        <div class="monitor-overlay">LIVE GATE FEED</div>
-                        <div class="scanner-line"></div>
-                        <video id="gate-camera-feed" autoplay playsinline muted class="camera-feed"
-                            style="border-radius: 12px;"></video>
-                        <div class="plate-overlay" id="detected-plate-admin-gate"
-                            style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.9); color:white; padding:10px 20px; border-radius:10px; border:2px solid #3b82f6; font-size:22px; font-weight:800; z-index:10; font-family:monospace; letter-spacing: 1px;">
-                            Scanning...</div>
-                    </div>
-
-                    <div class="status-msg" id="gate-camera-status"
-                        style="text-align: center; margin-top: 15px; color: var(--text-main); font-weight: 500; min-height: 24px;">
-                        Initializing camera system...</div>
-                    <canvas id="gate-snapshot-canvas" style="display: none;"></canvas>
-
-                    <div id="gate-match-entry-result"
-                        style="display:none; margin-top: 20px; padding: 20px; background: rgba(16, 185, 129, 0.15); border-radius: 16px; border: 1px solid rgba(16, 185, 129, 0.4); text-align: center; animation: slideUp 0.3s ease;">
-                        <div
-                            style="color: #10b981; font-weight: 700; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
-                            ✅ Approved Entry Found</div>
-                        <p style="color: var(--text-main); font-weight: 500; font-size: 16px; margin-bottom: 15px;"
-                            id="gate-match-entry-text"></p>
-                        <button id="btn-gate-open-entry" class="btn btn-primary"
-                            style="width: 100%; background: linear-gradient(135deg, #10b981, #059669); border: none;">Open
-                            Gate for Entry</button>
-                    </div>
-
-                    <div id="gate-match-exit-result"
-                        style="display:none; margin-top: 20px; padding: 20px; background: rgba(59, 130, 246, 0.15); border-radius: 16px; border: 1px solid rgba(59, 130, 246, 0.4); text-align: center; animation: slideUp 0.3s ease;">
-                        <div
-                            style="color: #3b82f6; font-weight: 700; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
-                            🚗 Vehicle Exit Registered</div>
-                        <p style="color: var(--text-main); font-weight: 500; font-size: 15px; margin-bottom: 5px;"
-                            id="gate-match-exit-plate"></p>
-                        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;"
-                            id="gate-match-exit-charge"></p>
-                        <div style="color: #60a5fa; font-weight: 600; font-size: 13px;">Gate auto-opening for exit...
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Blocked Visitors View -->
-            <div id="blocked-view" class="view-section" style="display: none;">
-                <header class="top-nav">
-                    <div>
-                        <h1>Blocked Visitors</h1>
-                        <p class="subtitle">All visitors blocked by residents</p>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <input type="text" id="blocked-search" placeholder="Search by name, phone or flat…"
-                            style="padding:8px 14px; border-radius:10px; border:1px solid var(--border); background:rgba(15,23,42,0.6); color:var(--text-main); font-size:14px; font-family:'Inter',sans-serif; outline:none; width:240px;">
-                        <button onclick="loadBlockedVisitors()"
-                            style="padding:8px 16px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:var(--text-main); font-size:13px; font-family:'Inter',sans-serif; cursor:pointer;">
-                            ↺ Refresh
-                        </button>
-                    </div>
-                </header>
-
-                <div class="table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Visitor Name</th>
-                                <th>Phone</th>
-                                <th>Blocked By (Flat)</th>
-                                <th>Blocked At</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="blocked-body">
-                            <!-- Filled by JS -->
-                        </tbody>
-                    </table>
-                    <div id="empty-state-blocked" class="empty-state hidden">
-                        <p>No blocked visitors found.</p>
-                    </div>
-                </div>
             </div>
         </main>
     </div>
 
     <script src="https://unpkg.com/tesseract.js@v5.0.3/dist/tesseract.min.js"></script>
+    <script>
+        // ===== PASSWORD VISIBILITY TOGGLE FEATURE =====
+        function initPasswordToggle(inputId, toggleId) {
+            const inputEl = document.getElementById(inputId);
+            const toggleBtn = document.getElementById(toggleId);
+
+            if (!inputEl || !toggleBtn) return;
+
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+
+                if (inputEl.type === 'password') {
+                    inputEl.type = 'text';
+                    toggleBtn.textContent = '🙈';
+                    toggleBtn.title = 'Hide password';
+                } else {
+                    inputEl.type = 'password';
+                    toggleBtn.textContent = '👁️';
+                    toggleBtn.title = 'Show password';
+                }
+            });
+        }
+
+        // ===== PASSWORD VALIDATION FEATURE =====
+        function validatePasswordStrength(password) {
+            const requirements = {
+                length: password.length >= 8,
+                uppercase: /[A-Z]/.test(password),
+                special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+            };
+            return requirements;
+        }
+
+        function updatePasswordRequirements(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            const password = input.value;
+            const reqs = validatePasswordStrength(password);
+
+            // Update requirement displays
+            const lengthIcon = document.getElementById('req-length-icon');
+            const uppercaseIcon = document.getElementById('req-uppercase-icon');
+            const specialIcon = document.getElementById('req-special-icon');
+
+            const lengthText = document.getElementById('req-length');
+            const uppercaseText = document.getElementById('req-uppercase');
+            const specialText = document.getElementById('req-special');
+
+            // Update length requirement
+            if (lengthIcon) {
+                lengthIcon.className = reqs.length ? 'requirement-icon checked' : 'requirement-icon unchecked';
+                lengthText.className = reqs.length ? 'requirement-text checked' : 'requirement-text';
+            }
+
+            // Update uppercase requirement
+            if (uppercaseIcon) {
+                uppercaseIcon.className = reqs.uppercase ? 'requirement-icon checked' : 'requirement-icon unchecked';
+                uppercaseText.className = reqs.uppercase ? 'requirement-text checked' : 'requirement-text';
+            }
+
+            // Update special character requirement
+            if (specialIcon) {
+                specialIcon.className = reqs.special ? 'requirement-icon checked' : 'requirement-icon unchecked';
+                specialText.className = reqs.special ? 'requirement-text checked' : 'requirement-text';
+            }
+
+            // Enable/disable submit button
+            const submitBtn = document.getElementById('reset-submit-btn');
+            if (submitBtn) {
+                submitBtn.disabled = !Object.values(reqs).every(v => v);
+            }
+
+            return Object.values(reqs).every(v => v);
+        }
+
+        // Initialize password toggles
+        document.addEventListener('DOMContentLoaded', () => {
+            initPasswordToggle('password', 'password-toggle');
+            initPasswordToggle('new-password', 'new-password-toggle');
+            initPasswordToggle('confirm-password', 'confirm-password-toggle');
+
+            // Add real-time validation to new-password field
+            const newPasswordInput = document.getElementById('new-password');
+            if (newPasswordInput) {
+                newPasswordInput.addEventListener('input', () => {
+                    updatePasswordRequirements('new-password');
+                });
+            }
+
+            // Reset form submission
+            const resetForm = document.getElementById('reset-form');
+            if (resetForm) {
+                resetForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+
+                    const newPass = document.getElementById('new-password').value;
+                    const confirmPass = document.getElementById('confirm-password').value;
+                    const resetError = document.getElementById('reset-error');
+
+                    // Validate strength
+                    const reqs = validatePasswordStrength(newPass);
+                    if (!Object.values(reqs).every(v => v)) {
+                        resetError.textContent = "Password does not meet requirements!";
+                        resetError.style.display = 'block';
+                        return;
+                    }
+
+                    // Check if passwords match
+                    if (newPass !== confirmPass) {
+                        resetError.textContent = "Passwords do not match!";
+                        resetError.style.display = 'block';
+                        return;
+                    }
+
+                    resetError.style.display = 'none';
+                    alert("Password reset successfully!");
+                    showAuthScreen('screen-login');
+                });
+            }
+        });
+
+        // Placeholder functions
+        function showAuthScreen(screenId) {
+            document.querySelectorAll('.auth-screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+    </script>
     <script src="js/admin.js"></script>
-
-    <!-- Gate Notification Banner (injected by JS, but styles defined here) -->
-    <style>
-        /* ===================================================
-           GATE NOTIFICATION SYSTEM
-           =================================================== */
-
-        /* Individual gate alert card */
-        @keyframes gateSlideIn {
-            from {
-                opacity: 0;
-                transform: translateX(120%) scale(0.92);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateX(0) scale(1);
-            }
-        }
-
-        @keyframes gatePulseRing {
-            0% {
-                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55), 0 8px 32px rgba(0, 0, 0, 0.4);
-            }
-
-            70% {
-                box-shadow: 0 0 0 12px rgba(16, 185, 129, 0), 0 8px 32px rgba(0, 0, 0, 0.4);
-            }
-
-            100% {
-                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0), 0 8px 32px rgba(0, 0, 0, 0.4);
-            }
-        }
-
-        @keyframes gateDismiss {
-            to {
-                opacity: 0;
-                transform: translateX(110%) scale(0.9);
-            }
-        }
-
-        #gate-alert-stack {
-            position: fixed;
-            top: 24px;
-            right: 24px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            pointer-events: none;
-            max-width: 360px;
-            width: 100%;
-        }
-
-        .gate-alert {
-            pointer-events: all;
-            background: linear-gradient(135deg, #0f2620 0%, #0f1a2a 100%);
-            border: 1.5px solid rgba(16, 185, 129, 0.5);
-            border-radius: 16px;
-            padding: 18px 20px;
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55), 0 8px 32px rgba(0, 0, 0, 0.4);
-            animation: gateSlideIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both,
-                gatePulseRing 1.8s ease-in-out 0.5s infinite;
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* Green accent bar on left */
-        .gate-alert::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: linear-gradient(180deg, #10b981, #059669);
-            border-radius: 16px 0 0 16px;
-        }
-
-        .gate-alert-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-
-        .gate-alert-icon {
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: rgba(16, 185, 129, 0.15);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            flex-shrink: 0;
-        }
-
-        .gate-alert-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: #10b981;
-            letter-spacing: 0.3px;
-        }
-
-        .gate-alert-subtitle {
-            font-size: 12px;
-            color: rgba(148, 163, 184, 0.8);
-            margin-top: 1px;
-        }
-
-        .gate-alert-visitor {
-            font-size: 16px;
-            font-weight: 700;
-            color: #f8fafc;
-            margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .gate-alert-details {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 14px;
-        }
-
-        .gate-alert-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            padding: 4px 9px;
-            font-size: 12px;
-            color: #94a3b8;
-            font-weight: 500;
-        }
-
-        .gate-alert-chip strong {
-            color: #f8fafc;
-        }
-
-        .gate-alert-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .gate-open-btn {
-            flex: 1;
-            padding: 10px 14px;
-            border: none;
-            border-radius: 10px;
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            font-size: 13px;
-            font-weight: 700;
-            font-family: 'Inter', sans-serif;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            transition: all 0.18s ease;
-            letter-spacing: 0.3px;
-        }
-
-        .gate-open-btn:hover {
-            background: linear-gradient(135deg, #059669, #047857);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
-        }
-
-        .gate-open-btn:active {
-            transform: scale(0.96);
-        }
-
-        .gate-dismiss-btn {
-            padding: 10px 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.04);
-            color: #64748b;
-            font-size: 13px;
-            font-weight: 600;
-            font-family: 'Inter', sans-serif;
-            cursor: pointer;
-            transition: all 0.18s ease;
-        }
-
-        .gate-dismiss-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: #94a3b8;
-        }
-
-        /* Notification bell badge on sidebar */
-        .gate-notif-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 18px;
-            height: 18px;
-            background: #ef4444;
-            color: white;
-            border-radius: 50%;
-            font-size: 10px;
-            font-weight: 700;
-            margin-left: auto;
-            animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-        }
-
-        @keyframes badgePop {
-            from {
-                transform: scale(0);
-            }
-
-            to {
-                transform: scale(1);
-            }
-        }
-
-        /* Audio ding visual feedback when new notif arrives */
-        .gate-alert.new-flash {
-            animation: gateSlideIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both,
-                gatePulseRing 1.8s ease-in-out 0.5s infinite;
-        }
-    </style>
 
     <!-- Gate Alert Stack Container -->
     <div id="gate-alert-stack"></div>
