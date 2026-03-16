@@ -846,6 +846,36 @@
     </div>
 
     <script src="https://unpkg.com/tesseract.js@v5.0.3/dist/tesseract.min.js"></script>
+    <script>
+        // ===== PASSWORD VISIBILITY TOGGLE FEATURE =====
+        function initPasswordToggle(inputId, toggleId) {
+            const inputEl = document.getElementById(inputId);
+            const toggleBtn = document.getElementById(toggleId);
+
+            if (!inputEl || !toggleBtn) return;
+
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+
+                if (inputEl.type === 'password') {
+                    inputEl.type = 'text';
+                    toggleBtn.textContent = '🙈'; // Eye closed icon
+                    toggleBtn.title = 'Hide password';
+                } else {
+                    inputEl.type = 'password';
+                    toggleBtn.textContent = '👁️'; // Eye open icon
+                    toggleBtn.title = 'Show password';
+                }
+            });
+        }
+
+        // Initialize all password toggles on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initPasswordToggle('password', 'password-toggle');
+            initPasswordToggle('new-password', 'new-password-toggle');
+            initPasswordToggle('confirm-password', 'confirm-password-toggle');
+        });
+    </script>
     <script src="js/admin.js"></script>
 
     <!-- Gate Notification Banner (injected by JS, but styles defined here) -->
