@@ -4,6 +4,19 @@ const CACHE_NAME = 'smartparkk-v1';
 // Install event - cache resources
 self.addEventListener('install', (event) => {
     console.log('[Service Worker] Installing...');
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll([
+                '/',
+                '/index.html',
+                '/resident.html',
+                '/admin.html',
+                '/logo.png',
+                '/manifest.json',
+                '/sounds/Car Horn Beeps.mp3'
+            ]);
+        })
+    );
     self.skipWaiting();
 });
 
@@ -39,7 +52,9 @@ self.addEventListener('push', (event) => {
         data: data.data || {
             url: '/resident',
             requestId: data.requestId
-        }
+        },
+        // Custom sound file
+        sound: '/sounds/Car Horn Beeps.mp3'
     };
 
     // Show notification
