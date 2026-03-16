@@ -15,68 +15,18 @@ let pendingResetPhone = null;
 let _blockModalAction = null; // 'block' | 'unblock'
 let _blockModalData = null;   // { phone, name }
 
-// Notification sound
-let audioContext = null;
-
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
     checkSession();
     registerServiceWorker();
 });
 
-// Play custom notification sound using Web Audio API
-function playNotificationSound() {
-    try {
-        // Create audio context if not exists
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        
-        // Generate a pleasant notification tone
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        // Set tone properties - doorbell-like sound
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
-        oscillator.frequency.setValueAtTime(1100, audioContext.currentTime + 0.1);
-        oscillator.frequency.setValueAtTime(880, audioContext.currentTime + 0.2);
-        
-        // Volume envelope
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialDecayTo = 0.01;
-        gainNode.gain.setValueAtTime(0.01, audioContext.currentTime + 0.4);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.4);
-        
-        console.log('🔊 Notification sound played');
-    } catch (e) {
-        console.log('Could not play notification sound:', e);
-    }
-}
-
 // PWA: Service Worker registration
 async function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         try {
-            const registration = await navigator.serviceWorker.register('/js/service-worker.js');
+            const registration = await navigator.serviceWorker.register('/sw.js');
             console.log('Service Worker registered with scope:', registration.scope);
-            
-            // Request notification permission
-            if ('Notification' in window) {
-                const permission = await Notification.requestPermission();
-                if (permission === 'granted') {
-                    console.log('✅ Notification permission granted');
-                } else {
-                    console.log('❌ Notification permission denied');
-                }
-            }
-            
-            return registration;
         } catch (err) {
             console.error('Service Worker registration failed:', err);
         }
