@@ -274,28 +274,22 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(settings => {
                 settings.forEach(s => {
                     if (s.key === 'smartpark_total_parking') {
-                        const el = document.getElementById('total-parking-display');
-                        const inputEl = document.getElementById('total-parking-input');
-                        if (el) el.textContent = s.value;
-                        if (inputEl) inputEl.value = s.value;
+                        document.getElementById('total-parking-display').textContent = s.value;
+                        document.getElementById('total-parking-input').value = s.value;
                         localStorage.setItem('smartpark_total_parking', s.value);
                     }
                     if (s.key === 'smartpark_rate_per_hour') {
-                        const el = document.getElementById('rate-parking-display');
-                        const inputEl = document.getElementById('rate-parking-input');
-                        if (el) el.textContent = s.value;
-                        if (inputEl) inputEl.value = s.value;
+                        document.getElementById('rate-parking-display').textContent = s.value;
+                        document.getElementById('rate-parking-input').value = s.value;
                         localStorage.setItem('smartpark_rate_per_hour', s.value);
                     }
                     if (s.key === 'smartpark_fine_amount') {
-                        const el = document.getElementById('fine-amount-display');
-                        const inputEl = document.getElementById('fine-amount-input');
-                        if (el) el.textContent = s.value;
-                        if (inputEl) inputEl.value = s.value;
+                        document.getElementById('fine-amount-display').textContent = s.value;
+                        document.getElementById('fine-amount-input').value = s.value;
                         localStorage.setItem('smartpark_fine_amount', s.value);
                     }
                 });
-                if (typeof updateParkingStats === 'function') updateParkingStats();
+                updateParkingStats();
             })
             .catch(err => console.error('[SETTINGS] Load error:', err));
 
@@ -326,14 +320,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const viewBlocked = document.getElementById('blocked-view');
 
         const allTabs = [tabDashboard, tabGate, tabResidents, tabHistory, tabParkingLot, tabBlocked];
-        const allViews = [viewDashboard, viewGate, viewResidents, viewHistory, viewParkingLot, viewBlocked].filter(v => v);
+        const allViews = [viewDashboard, viewGate, viewResidents, viewHistory, viewParkingLot, viewBlocked];
 
         function switchTab(activeTab, activeView) {
-            allTabs.forEach(t => t && t.classList.remove('active'));
-            allViews.forEach(v => v && (v.style.display = 'none'));
+            allTabs.forEach(t => t.classList.remove('active'));
+            allViews.forEach(v => v.style.display = 'none');
 
-            activeTab && activeTab.classList.add('active');
-            activeView && (activeView.style.display = 'block');
+            activeTab.classList.add('active');
+            activeView.style.display = 'block';
         }
 
         tabDashboard.addEventListener('click', (e) => {
@@ -383,52 +377,39 @@ document.addEventListener('DOMContentLoaded', () => {
         const cpNewPass = document.getElementById('cp-new-pass');
         const cpConfirmPass = document.getElementById('cp-confirm-pass');
         const cpError = document.getElementById('cp-error');
-        const changePassBtn = document.getElementById('change-password-btn');
         
-        if (changePassBtn) {
-            changePassBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (cpNewPass) cpNewPass.value = '';
-                if (cpConfirmPass) cpConfirmPass.value = '';
-                if (cpError) cpError.style.display = 'none';
-                if (changePassModal) changePassModal.style.display = 'flex';
-            });
-        }
+        document.getElementById('change-password-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            cpNewPass.value = '';
+            cpConfirmPass.value = '';
+            cpError.style.display = 'none';
+            changePassModal.style.display = 'flex';
+        });
 
-        const cpCancelBtn = document.getElementById('cp-cancel-btn');
-        if (cpCancelBtn) {
-            cpCancelBtn.addEventListener('click', () => {
-                if (changePassModal) changePassModal.style.display = 'none';
-            });
-        }
+        document.getElementById('cp-cancel-btn').addEventListener('click', () => {
+            changePassModal.style.display = 'none';
+        });
 
-        const cpSaveBtn = document.getElementById('cp-save-btn');
-        if (cpSaveBtn) {
-            cpSaveBtn.addEventListener('click', () => {
-                const newPass = cpNewPass ? cpNewPass.value : '';
-                const confirmPass = cpConfirmPass ? cpConfirmPass.value : '';
+        document.getElementById('cp-save-btn').addEventListener('click', () => {
+            const newPass = cpNewPass.value;
+            const confirmPass = cpConfirmPass.value;
 
-                if (newPass.length < 6) {
-                    if (cpError) {
-                        cpError.textContent = 'Password must be at least 6 characters';
-                        cpError.style.display = 'block';
-                    }
-                    return;
-                }
+            if (newPass.length < 6) {
+                cpError.textContent = 'Password must be at least 6 characters';
+                cpError.style.display = 'block';
+                return;
+            }
 
-                if (newPass !== confirmPass) {
-                    if (cpError) {
-                        cpError.textContent = 'Passwords do not match';
-                        cpError.style.display = 'block';
-                    }
-                    return;
-                }
+            if (newPass !== confirmPass) {
+                cpError.textContent = 'Passwords do not match';
+                cpError.style.display = 'block';
+                return;
+            }
 
-                localStorage.setItem('smartpark_admin_creds', JSON.stringify({ username: 'admin', password: newPass }));
-                if (changePassModal) changePassModal.style.display = 'none';
-                alert('Password changed successfully!');
-            });
-        }
+            localStorage.setItem('smartpark_admin_creds', JSON.stringify({ username: 'admin', password: newPass }));
+            changePassModal.style.display = 'none';
+            alert('Password changed successfully!');
+        });
 
         // Logout
         document.getElementById('logout-btn').addEventListener('click', (e) => {
@@ -452,7 +433,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalInput = document.getElementById('total-parking-input');
         let isEditing = false;
 
-        if (editBtn && totalInput) {
         editBtn.addEventListener('click', () => {
             if (!isEditing) {
                 totalDisplay.style.display = 'none';
@@ -493,7 +473,6 @@ document.addEventListener('DOMContentLoaded', () => {
             totalInput.style.display = 'none';
             isEditing = false;
             updateParkingStats();
-        }
         }
 
         function cancelEdit() {
@@ -639,10 +618,10 @@ async function loadTableData() {
         const activeCountEl = document.getElementById('active-count');
 
         if (!entries || entries.length === 0) {
-            if (logsBody) logsBody.innerHTML = '';
-            if (emptyState) emptyState.classList.remove('hidden');
-            if (activeCountEl) activeCountEl.textContent = '0';
-            if (typeof updateParkingStats === 'function') updateParkingStats(0);
+            logsBody.innerHTML = '';
+            emptyState.classList.remove('hidden');
+            activeCountEl.textContent = '0';
+            updateParkingStats(0);
             const revenueEl = document.getElementById('revenue-month');
             if (revenueEl) revenueEl.textContent = '₹0.00';
             return;
@@ -694,30 +673,30 @@ async function loadTableData() {
 
         // Render Dashboard Table
         if (dashboardEntries.length === 0) {
-            if (logsBody) logsBody.innerHTML = '';
-            if (emptyState) emptyState.classList.remove('hidden');
+            logsBody.innerHTML = '';
+            emptyState.classList.remove('hidden');
         } else {
-            if (emptyState) emptyState.classList.add('hidden');
+            emptyState.classList.add('hidden');
         }
 
         let activeCount = 0;
-        if (logsBody) logsBody.innerHTML = '';
+        logsBody.innerHTML = '';
 
         dashboardEntries.forEach(entry => {
             const isCompleted = !!entry.exitTime;
             if (!isCompleted) activeCount++;
-            if (logsBody) logsBody.appendChild(createRowHTML(entry, isCompleted));
+            logsBody.appendChild(createRowHTML(entry, isCompleted));
         });
 
         // Render History Table
         if (historyEntries.length === 0) {
-            if (historyBody) historyBody.innerHTML = '';
-            if (historyEmptyState) historyEmptyState.classList.remove('hidden');
+            historyBody.innerHTML = '';
+            historyEmptyState.classList.remove('hidden');
         } else {
-            if (historyEmptyState) historyEmptyState.classList.add('hidden');
+            historyEmptyState.classList.add('hidden');
         }
 
-        if (historyBody) historyBody.innerHTML = '';
+        historyBody.innerHTML = '';
         historyEntries.forEach(entry => {
             const isCompleted = !!entry.exitTime;
             historyBody.appendChild(createRowHTML(entry, isCompleted));
