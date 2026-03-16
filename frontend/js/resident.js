@@ -166,11 +166,19 @@ registerForm.addEventListener('submit', async (e) => {
 
         const newResident = { id: Date.now().toString(), name, flatInput, baseFlatId, role, phone, carPlate, password, isAvailable: true };
 
-        await fetch('/api/residents', {
+        const res = await fetch('/api/residents', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newResident)
         });
+
+        if (!res.ok) {
+            const errData = await res.json();
+            alert(errData.message || 'Registration failed. Please try again.');
+            btn.disabled = false;
+            btn.textContent = 'Register';
+            return;
+        }
 
         alert("Registration successful! Please login.");
         showScreen('screen-login');
