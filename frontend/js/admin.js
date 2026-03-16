@@ -75,14 +75,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const loginError = document.getElementById('login-error');
 
+    let adminCreds = { username: 'admin', password: 'admin123' };
+
+    fetch('/api/admin-credentials')
+        .then(res => res.json())
+        .then(creds => { adminCreds = creds; })
+        .catch(() => {});
+
     loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
 
         const user = document.getElementById('username').value.trim();
         const pass = document.getElementById('password').value;
 
-        // Hardcoded demo credentials
-        if (user === 'admin' && pass === 'admin123') {
+        if (user === adminCreds.username && pass === adminCreds.password) {
             sessionStorage.setItem('smartpark_admin_auth', 'true');
             sessionStorage.setItem('smartpark_admin_time', Date.now().toString());
             showDashboard();
@@ -226,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Step 3: Save New Password
-    resetForm.addEventListener('submit', (e) => {
+    resetForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const newPass = document.getElementById('new-password').value;
@@ -245,8 +251,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         resetError.style.display = 'none';
-        alert("Password reset successfully!");
-        showAuthScreen('screen-login');
+
+        try {
+            const res = await fetch('/api/admin-credentials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: 'admin', password: newPass })
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                alert("Password reset successfully!");
+                showAuthScreen('screen-login');
+            } else {
+                alert("Failed to reset password: " + result.message);
+            }
+        } catch (err) {
+            alert("Error connecting to server");
+            console.error(err);
+        }
     });
 
     // ============================================
