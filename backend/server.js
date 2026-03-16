@@ -267,42 +267,6 @@ app.post('/api/settings', async (req, res) => {
     }
 });
 
-// Admin credentials API
-app.get('/api/admin-credentials', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('settings')
-            .select('value')
-            .eq('key', 'admin_credentials')
-            .single();
-        
-        if (error || !data) {
-            return res.json({ username: 'admin', password: 'admin123' });
-        }
-        res.json(JSON.parse(data.value));
-    } catch (err) {
-        res.json({ username: 'admin', password: 'admin123' });
-    }
-});
-
-app.post('/api/admin-credentials', async (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-        return res.status(400).json({ success: false, message: 'Username and password required' });
-    }
-
-    try {
-        const { error } = await supabase
-            .from('settings')
-            .upsert([{ key: 'admin_credentials', value: JSON.stringify({ username, password }), updated_at: new Date().toISOString() }], { onConflict: 'key' });
-
-        if (error) throw error;
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
 // ============================================
 // WHATSAPP OTP
 // ============================================
