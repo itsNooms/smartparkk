@@ -78,7 +78,8 @@
                         <label for="login-password">Password</label>
                         <div class="password-input-group">
                             <input type="password" id="login-password" required placeholder="••••••••">
-                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('login-password')">
+                            <button type="button" class="password-toggle-btn"
+                                onclick="togglePasswordVisibility('login-password', this)">
                                 👁️
                             </button>
                         </div>
@@ -152,7 +153,8 @@
                         <label for="reset-password">New Password</label>
                         <div class="password-input-group">
                             <input type="password" id="reset-password" required placeholder="Create a new password">
-                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('reset-password')">
+                            <button type="button" class="password-toggle-btn"
+                                onclick="togglePasswordVisibility('reset-password', this)">
                                 👁️
                             </button>
                         </div>
@@ -160,8 +162,10 @@
                     <div class="input-group">
                         <label for="reset-confirm-password">Confirm Password</label>
                         <div class="password-input-group">
-                            <input type="password" id="reset-confirm-password" required placeholder="Confirm new password">
-                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('reset-confirm-password')">
+                            <input type="password" id="reset-confirm-password" required
+                                placeholder="Confirm new password">
+                            <button type="button" class="password-toggle-btn"
+                                onclick="togglePasswordVisibility('reset-confirm-password', this)">
                                 👁️
                             </button>
                         </div>
@@ -211,7 +215,8 @@
                         <label for="reg-password">Password</label>
                         <div class="password-input-group">
                             <input type="password" id="reg-password" required placeholder="Create a password">
-                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('reg-password')">
+                            <button type="button" class="password-toggle-btn"
+                                onclick="togglePasswordVisibility('reg-password', this)">
                                 👁️
                             </button>
                         </div>
@@ -401,9 +406,9 @@
 
     <script>
         // Password visibility toggle function
-        function togglePasswordVisibility(fieldId) {
+        function togglePasswordVisibility(fieldId, btnEl) {
             const passwordField = document.getElementById(fieldId);
-            const toggleBtn = event.currentTarget;
+            const toggleBtn = btnEl || event.currentTarget;
 
             if (passwordField.type === 'password') {
                 passwordField.type = 'text';
