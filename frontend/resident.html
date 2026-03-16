@@ -17,6 +17,54 @@
 
     <link rel="stylesheet" href="css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===== PASSWORD INPUT WITH TOGGLE ===== */
+        .password-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group input[type="password"],
+        .input-group input[type="text"].password-visible {
+            width: 100%;
+            padding: 14px 16px;
+            padding-right: 45px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .input-group input[type="password"]:focus,
+        .input-group input[type="text"].password-visible:focus {
+            border-color: var(--primary);
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 14px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 6px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            font-size: 18px;
+        }
+
+        .password-toggle-btn:hover {
+            color: var(--primary);
+        }
+    </style>
 </head>
 
 <body>
@@ -38,7 +86,12 @@
                     </div>
                     <div class="input-group">
                         <label for="login-password">Password</label>
-                        <input type="password" id="login-password" required placeholder="••••••••">
+                        <div class="password-input-wrapper">
+                            <input type="password" id="login-password" required placeholder="••••••••">
+                            <button type="button" class="password-toggle-btn" id="login-password-toggle" title="Show/hide password">
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <button type="submit" class="btn btn-primary">Login</button>
@@ -107,11 +160,21 @@
                 <form id="reset-form">
                     <div class="input-group">
                         <label for="reset-password">New Password</label>
-                        <input type="password" id="reset-password" required placeholder="Create a new password">
+                        <div class="password-input-wrapper">
+                            <input type="password" id="reset-password" required placeholder="Create a new password">
+                            <button type="button" class="password-toggle-btn" id="reset-password-toggle" title="Show/hide password">
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <div class="input-group">
                         <label for="reset-confirm-password">Confirm Password</label>
-                        <input type="password" id="reset-confirm-password" required placeholder="Confirm new password">
+                        <div class="password-input-wrapper">
+                            <input type="password" id="reset-confirm-password" required placeholder="Confirm new password">
+                            <button type="button" class="password-toggle-btn" id="reset-confirm-password-toggle" title="Show/hide password">
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <div class="status-msg" id="resident-reset-error"
                         style="color: var(--danger); display: none; margin-bottom: 15px; min-height: 0;">Passwords do
@@ -156,7 +219,12 @@
                     </div>
                     <div class="input-group">
                         <label for="reg-password">Password</label>
-                        <input type="password" id="reg-password" required placeholder="Create a password">
+                        <div class="password-input-wrapper">
+                            <input type="password" id="reg-password" required placeholder="Create a password">
+                            <button type="button" class="password-toggle-btn" id="reg-password-toggle" title="Show/hide password">
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary">Register</button>
                     <button type="button" class="btn btn-text" onclick="showScreen('screen-login')">Already registered?
@@ -340,6 +408,38 @@
             border-color: rgba(239, 68, 68, 0.55);
         }
     </style>
+
+    <script>
+        // ===== PASSWORD VISIBILITY TOGGLE FEATURE =====
+        function initPasswordToggle(inputId, toggleId) {
+            const inputEl = document.getElementById(inputId);
+            const toggleBtn = document.getElementById(toggleId);
+
+            if (!inputEl || !toggleBtn) return;
+
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+
+                if (inputEl.type === 'password') {
+                    inputEl.type = 'text';
+                    toggleBtn.textContent = '🙈'; // Eye closed icon
+                    toggleBtn.title = 'Hide password';
+                } else {
+                    inputEl.type = 'password';
+                    toggleBtn.textContent = '👁️'; // Eye open icon
+                    toggleBtn.title = 'Show password';
+                }
+            });
+        }
+
+        // Initialize all password toggles on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initPasswordToggle('login-password', 'login-password-toggle');
+            initPasswordToggle('reset-password', 'reset-password-toggle');
+            initPasswordToggle('reset-confirm-password', 'reset-confirm-password-toggle');
+            initPasswordToggle('reg-password', 'reg-password-toggle');
+        });
+    </script>
 
     <script src="js/resident.js"></script>
 </body>
