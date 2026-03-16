@@ -87,6 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const pass = document.getElementById('password').value;
         const adminCreds = getAdminCreds();
 
+        console.log('Login attempt:', user, '| Stored creds:', adminCreds);
+
         if (user === adminCreds.username && pass === adminCreds.password) {
             sessionStorage.setItem('smartpark_admin_auth', 'true');
             sessionStorage.setItem('smartpark_admin_time', Date.now().toString());
@@ -253,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Store credentials in localStorage
         localStorage.setItem('smartpark_admin_creds', JSON.stringify({ username: 'admin', password: newPass }));
+        console.log('Password reset to:', newPass);
         alert("Password reset successfully! Use your new password to login.");
         showAuthScreen('screen-login');
     });
