@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pass = document.getElementById('password').value;
 
         // Hardcoded demo credentials
-        if (user === 'admin' && pass === 'admin123') {
+        if (user === 'admin' && pass === 'Admin@123') {
             sessionStorage.setItem('smartpark_admin_auth', 'true');
             sessionStorage.setItem('smartpark_admin_time', Date.now().toString());
             showDashboard();
