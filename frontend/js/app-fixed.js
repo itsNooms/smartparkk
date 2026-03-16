@@ -1,3 +1,7 @@
+// =====================================================
+// VISITOR PORTAL - app.js
+// =====================================================
+
 /* State */
 let visitorData = {
     id: '',
@@ -105,7 +109,7 @@ fetchAndUpdateSpots();
 setInterval(fetchAndUpdateSpots, 15000);
 
 // =============================================
-// DURATION PICKER
+// DURATION PICKER - CRITICAL FIX
 // =============================================
 let selectedHours = 4; // default
 function getRate() {
@@ -120,29 +124,40 @@ function updateEstimate(hours) {
     el.textContent = '\u20B9' + charge.toFixed(2);
 }
 
-// Wire up chips after DOM ready (called after DOMContentLoaded equivalent — safe here since app.js loads at bottom)
-(function initDurationPicker() {
+// Wire up chips after DOM ready
+function initDurationPicker() {
+    console.log('🔧 Initializing duration picker...');
+    
     const chips = document.querySelectorAll('.chip');
     const customWrap = document.getElementById('custom-duration-wrap');
     const customHoursInput = document.getElementById('custom-hours');
     const customMinsInput = document.getElementById('custom-mins');
 
+    if (!chips.length) {
+        console.warn('⚠️ Duration chips not found, retrying...');
+        setTimeout(initDurationPicker, 500);
+        return;
+    }
+
+    console.log(`✅ Found ${chips.length} duration chips`);
+
     function updateCustomEstimate() {
         let h = parseInt(customHoursInput.value) || 0;
         let m = parseInt(customMinsInput.value) || 0;
 
-        // Apply visual boundaries (0 bounds)
+        // Apply visual boundaries
         h = Math.max(0, Math.min(h, 24));
         m = Math.max(0, Math.min(m, 59));
 
         // Ensure at least 10 min total parking if custom is selected
         if (h === 0 && m === 0) m = 10;
 
-        // Convert the user's value into a decimal hour total
+        // Convert to decimal hours
         const total = h + (m / 60);
 
         selectedHours = total;
         visitorData.estimatedHours = total;
+        console.log(`📊 Custom duration updated: ${h}h ${m}m = ${total.toFixed(2)} hours`);
         updateEstimate(total);
     }
 
@@ -152,6 +167,8 @@ function updateEstimate(hours) {
             chip.classList.add('active');
 
             const val = chip.dataset.hours;
+            console.log(`👆 Chip clicked: ${val}`);
+            
             if (val === 'custom') {
                 customWrap.style.display = 'flex';
                 customHoursInput.focus();
@@ -160,8 +177,12 @@ function updateEstimate(hours) {
                 customWrap.style.display = 'none';
                 selectedHours = parseFloat(val);
                 visitorData.estimatedHours = selectedHours;
+                console.log(`📊 Duration set: ${selectedHours} hours`);
                 updateEstimate(selectedHours);
             }
+            
+            // Trigger auto-submit check
+            checkAutoSubmit();
         });
     });
 
@@ -174,7 +195,15 @@ function updateEstimate(hours) {
 
     // Init estimate for default 4-hr chip
     updateEstimate(4);
-})();
+    console.log('✅ Duration picker initialized');
+}
+
+// Call on load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDurationPicker);
+} else {
+    initDurationPicker();
+}
 
 // Storage Helpers
 async function saveToStorage(data) {
@@ -198,78 +227,65 @@ async function updateStorage(data) {
 }
 
 // =====================================================
-// PROFESSIONAL OCR ENGINE - ADVANCED VERSION
+// OCR ENGINE (from previous version)
 // =====================================================
-// Dramatically improved accuracy, validation, and scanning
-// Features: intelligent preprocessing, confidence scoring, 
-// multi-layer fuzzy matching, frame quality assessment
+
+// Camera state tracking
+let cameraState = {
+    isActive: false,
+    isScanningFrame: false,
+    lastFrameTime: 0,
+    freezeTimeout: null,
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 3
+};
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const OCR_CONFIG = {
-    // Scanning & timing
-    FRAME_INTERVAL_MS: 400,              // faster frame capture for more samples
-    VOTE_WINDOW: 8,                      // require agreement across 8+ frames for confidence
-    MIN_CONFIDENCE: 0.75,                // 75% agreement threshold
-    SCAN_TIMEOUT_DEFAULT: 30000,         // 30 seconds default
-    
-    // Plate geometry (typical Indian plates)
-    PLATE_MIN_LENGTH: 10,                // minimum readable chars
-    PLATE_MAX_LENGTH: 12,                // maximum readable chars
-    PLATE_ASPECT_RATIO: { min: 3, max: 5.5 }, // width/height ratio
-    
-    // Quality thresholds
-    MIN_PLATE_AREA_RATIO: 0.08,          // plate must be 8%+ of frame
-    MAX_PLATE_AREA_RATIO: 0.95,          // plate can't be >95% of frame
-    MIN_CONTRAST: 30,                    // minimum luminance spread
-    MIN_FOCUS_SHARPNESS: 0.4,            // edge variance indicator
-    
-    // Preprocessing enhancement
-    CONTRAST_ENHANCE: 1.8,               // multiply contrast boost
-    BRIGHTNESS_ADJUST: 10,               // brighten dark plates
-    KERNEL_SHARPEN: true,                // sharpen edges
+    FRAME_INTERVAL_MS: 400,
+    VOTE_WINDOW: 8,
+    MIN_CONFIDENCE: 0.75,
+    SCAN_TIMEOUT_DEFAULT: 30000,
+    PLATE_MIN_LENGTH: 10,
+    PLATE_MAX_LENGTH: 12,
+    PLATE_ASPECT_RATIO: { min: 3, max: 5.5 },
+    MIN_PLATE_AREA_RATIO: 0.08,
+    MAX_PLATE_AREA_RATIO: 0.95,
+    MIN_CONTRAST: 30,
+    MIN_FOCUS_SHARPNESS: 0.4,
+    CONTRAST_ENHANCE: 1.8,
+    BRIGHTNESS_ADJUST: 10,
+    KERNEL_SHARPEN: true,
 };
 
-// Common OCR character confusions + contextual fixes
 const OCR_CORRECTIONS = [
-    // Ambiguous chars (0/O, 1/I/L, 5/S, 8/B)
-    { pattern: /0(?=[A-Z]{2})/g, replace: 'O' },  // 0 before 2+ letters → O
-    { pattern: /(?<=[A-Z])1(?=[A-Z])/g, replace: 'I' }, // 1 between letters → I
-    { pattern: /5(?=[A-Z]{2})/g, replace: 'S' },  // 5 before 2+ letters → S
-    { pattern: /8(?=[A-Z]{2})/g, replace: 'B' },  // 8 before 2+ letters → B
-    { pattern: /Z/g, replace: '2' },               // Z → 2 (numeric context)
-    { pattern: /G/g, replace: '6' },               // G → 6 (numeric context)
-    { pattern: /T(?=\d)/g, replace: '7' },         // T before digit → 7
-    { pattern: /l(?=\d)/gi, replace: '1' },        // lowercase l before digit → 1
-    { pattern: /O(?=[0-9]{2,})/g, replace: '0' }, // O before 2+ digits → 0
+    { pattern: /0(?=[A-Z]{2})/g, replace: 'O' },
+    { pattern: /(?<=[A-Z])1(?=[A-Z])/g, replace: 'I' },
+    { pattern: /5(?=[A-Z]{2})/g, replace: 'S' },
+    { pattern: /8(?=[A-Z]{2})/g, replace: 'B' },
+    { pattern: /Z/g, replace: '2' },
+    { pattern: /G/g, replace: '6' },
+    { pattern: /T(?=\d)/g, replace: '7' },
+    { pattern: /l(?=\d)/gi, replace: '1' },
+    { pattern: /O(?=[0-9]{2,})/g, replace: '0' },
 ];
 
-// Indian plate format validation (state code + registration)
 const PLATE_PATTERN = /^[A-Z]{2}\d{1,2}[A-Z]{1,2}\d{4}$/;
 const VALID_STATES = ['AP', 'AR', 'AS', 'BR', 'CT', 'GA', 'GJ', 'HR', 'HP', 'JK', 'JH', 'KA', 
                       'KL', 'MP', 'MH', 'MN', 'ML', 'MZ', 'NL', 'OR', 'PB', 'RJ', 'SK', 'TN', 
                       'TG', 'TR', 'UP', 'UT', 'WB', 'LD', 'CH', 'DL', 'PY'];
 
-// ── GLOBAL STATE ──────────────────────────────────────────────────────────────
 let tesseractWorker = null;
 let isScanning = false;
-let recentDetections = [];  // buffer: { text, confidence, timestamp, quality }
-let frameStats = {
-    total: 0,
-    successful: 0,
-    skipped: 0,
-    qualityIssues: []
-};
+let recentDetections = [];
+let frameStats = { total: 0, successful: 0, skipped: 0, qualityIssues: [] };
 
 // ── FRAME QUALITY ASSESSMENT ──────────────────────────────────────────────────
-/**
- * Assess frame quality before OCR to skip waste processing time on bad frames
- */
 function assessFrameQuality(canvas) {
     const ctx = canvas.getContext('2d');
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imgData.data;
     
-    // 1. Compute contrast (luminance spread)
     let minL = 255, maxL = 0;
     const luminance = [];
     for (let i = 0; i < data.length; i += 4) {
@@ -280,14 +296,12 @@ function assessFrameQuality(canvas) {
     }
     const contrast = maxL - minL;
     
-    // 2. Compute edge sharpness (Sobel-like gradient variance)
     const width = canvas.width;
     const height = canvas.height;
     let edgeSum = 0;
     for (let y = 1; y < height - 1; y++) {
         for (let x = 1; x < width - 1; x++) {
             const idx = y * width + x;
-            // Simple Sobel approximation
             const gx = luminance[idx - width - 1] + 2*luminance[idx - 1] + luminance[idx + width - 1]
                      - luminance[idx - width + 1] - 2*luminance[idx + 1] - luminance[idx + width + 1];
             const gy = luminance[idx - width - 1] + 2*luminance[idx - width] + luminance[idx - width + 1]
@@ -295,40 +309,28 @@ function assessFrameQuality(canvas) {
             edgeSum += Math.sqrt(gx*gx + gy*gy);
         }
     }
-    const sharpness = edgeSum / (width * height) / 255; // normalized
+    const sharpness = edgeSum / (width * height) / 255;
     
-    // 3. Plate area detection (black/white region density)
     let darkPixels = 0;
     for (let L of luminance) {
         if (L < 100) darkPixels++;
     }
     const darkRatio = darkPixels / luminance.length;
     
-    const quality = {
+    return {
         contrast: contrast,
         sharpness: sharpness,
         darkRatio: darkRatio,
         isGood: contrast >= OCR_CONFIG.MIN_CONTRAST && sharpness >= OCR_CONFIG.MIN_FOCUS_SHARPNESS
     };
-    
-    return quality;
 }
 
-// ── ADVANCED PREPROCESSING ────────────────────────────────────────────────────
-/**
- * Multi-stage preprocessing for optimal OCR:
- * 1. Crop to center region (plate is usually centered)
- * 2. Greyscale + contrast enhancement
- * 3. Adaptive sharpening with edge detection
- * 4. Binarization with dynamic threshold
- * 5. Morphological cleanup (denoise)
- */
+// ── PREPROCESSING ────────────────────────────────────────────────────────────
 function preprocessPlateImage(canvas) {
     const ctx = canvas.getContext('2d');
     let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     let data = imgData.data;
     
-    // ① CROP: Center 70% (plates usually centered)
     const cropX = canvas.width * 0.15;
     const cropY = canvas.height * 0.2;
     const cropW = canvas.width * 0.7;
@@ -343,7 +345,6 @@ function preprocessPlateImage(canvas) {
     let cropData = cropCtx.getImageData(0, 0, cropW, cropH);
     let cropPixels = cropData.data;
     
-    // ② GREYSCALE + HISTOGRAM EQUALIZATION for contrast boost
     const grey = new Uint8ClampedArray(cropW * cropH);
     let histogram = new Uint32Array(256);
     
@@ -353,7 +354,6 @@ function preprocessPlateImage(canvas) {
         histogram[Math.floor(L)]++;
     }
     
-    // Compute cumulative histogram for equalization
     const cumulative = new Uint32Array(256);
     cumulative[0] = histogram[0];
     for (let i = 1; i < 256; i++) {
@@ -367,7 +367,6 @@ function preprocessPlateImage(canvas) {
         equalized[i] = Math.floor(normalized);
     }
     
-    // ③ CONTRAST ENHANCEMENT
     const enhanced = new Uint8ClampedArray(totalPixels);
     const mean = equalized.reduce((a,b) => a+b) / totalPixels;
     for (let i = 0; i < totalPixels; i++) {
@@ -375,10 +374,8 @@ function preprocessPlateImage(canvas) {
         enhanced[i] = Math.max(0, Math.min(255, val));
     }
     
-    // ④ EDGE SHARPENING (unsharp mask)
     const sharpened = new Uint8ClampedArray(totalPixels);
     if (OCR_CONFIG.KERNEL_SHARPEN) {
-        // Simple Gaussian blur for difference
         for (let y = 1; y < cropH - 1; y++) {
             for (let x = 1; x < cropW - 1; x++) {
                 const idx = y * cropW + x;
@@ -389,11 +386,10 @@ function preprocessPlateImage(canvas) {
                 ) / 16;
                 
                 const diff = enhanced[idx] - blur;
-                const sharp = enhanced[idx] + diff * 0.6; // unsharp strength
+                const sharp = enhanced[idx] + diff * 0.6;
                 sharpened[idx] = Math.max(0, Math.min(255, sharp));
             }
         }
-        // Border handling
         for (let i = 0; i < cropW; i++) {
             sharpened[i] = enhanced[i];
             sharpened[(cropH-1)*cropW + i] = enhanced[(cropH-1)*cropW + i];
@@ -406,17 +402,14 @@ function preprocessPlateImage(canvas) {
         for (let i = 0; i < totalPixels; i++) sharpened[i] = enhanced[i];
     }
     
-    // ⑤ ADAPTIVE BINARIZATION (Otsu's method for optimal threshold)
     let threshold = computeOtsuThreshold(sharpened);
     const binary = new Uint8ClampedArray(totalPixels);
     for (let i = 0; i < totalPixels; i++) {
         binary[i] = sharpened[i] > threshold ? 255 : 0;
     }
     
-    // ⑥ MORPHOLOGICAL CLEANUP (remove noise)
     const cleaned = morphologicalClean(binary, cropW, cropH);
     
-    // ⑦ CONVERT BACK TO RGBA CANVAS
     const finalCanvas = document.createElement('canvas');
     finalCanvas.width = cropW;
     finalCanvas.height = cropH;
@@ -434,9 +427,6 @@ function preprocessPlateImage(canvas) {
     return finalCanvas;
 }
 
-/**
- * Compute optimal binarization threshold using Otsu's method
- */
 function computeOtsuThreshold(pixels) {
     const histogram = new Uint32Array(256);
     for (let i = 0; i < pixels.length; i++) {
@@ -474,13 +464,9 @@ function computeOtsuThreshold(pixels) {
     return optimalThreshold;
 }
 
-/**
- * Morphological operations: erosion + dilation to remove noise
- */
 function morphologicalClean(pixels, width, height) {
     const result = new Uint8ClampedArray(pixels);
     
-    // Simple erosion (3x3 kernel): all neighbors must be 255
     const eroded = new Uint8ClampedArray(result);
     for (let y = 1; y < height - 1; y++) {
         for (let x = 1; x < width - 1; x++) {
@@ -499,7 +485,6 @@ function morphologicalClean(pixels, width, height) {
         }
     }
     
-    // Dilation: any neighbor is 255
     const dilated = new Uint8ClampedArray(eroded);
     for (let y = 1; y < height - 1; y++) {
         for (let x = 1; x < width - 1; x++) {
@@ -521,69 +506,42 @@ function morphologicalClean(pixels, width, height) {
     return dilated;
 }
 
-// ── OCR TEXT NORMALIZATION & VALIDATION ───────────────────────────────────────
-/**
- * Normalize OCR output with contextual intelligence
- */
+// ── NORMALIZATION & VALIDATION ────────────────────────────────────────────────
 function normaliseOCRText(text) {
     if (!text) return '';
-    
-    // Remove non-alphanumeric, uppercase
     let clean = text.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    
-    // Apply contextual corrections
     for (const correction of OCR_CORRECTIONS) {
         clean = clean.replace(correction.pattern, correction.replace);
     }
-    
     return clean;
 }
 
-/**
- * Validate if text matches Indian plate format
- */
 function isValidPlateFormat(text) {
     if (!text || text.length < OCR_CONFIG.PLATE_MIN_LENGTH) return false;
     if (text.length > OCR_CONFIG.PLATE_MAX_LENGTH) return false;
-    
-    // Try to match pattern
     if (PLATE_PATTERN.test(text)) {
         const stateCode = text.substring(0, 2);
         return VALID_STATES.includes(stateCode);
     }
-    
     return false;
 }
 
-/**
- * Calculate confidence score for OCR result
- */
 function computeConfidence(rawOcrResult, cleanText, frameQuality) {
-    let score = 0.7; // base
-    
-    // Boost for format validity
+    let score = 0.7;
     if (isValidPlateFormat(cleanText)) {
         score += 0.15;
     }
-    
-    // Boost for tesseract confidence if available
     if (rawOcrResult && rawOcrResult.data && rawOcrResult.data.confidence) {
         const tessConf = Math.min(rawOcrResult.data.confidence / 100, 1);
         score = Math.max(score, 0.6 + tessConf * 0.4);
     }
-    
-    // Adjust based on frame quality
     if (frameQuality && frameQuality.sharpness > 0.6) {
         score += 0.1;
     }
-    
     return Math.min(score, 1.0);
 }
 
-// ── INTELLIGENT VOTING SYSTEM ─────────────────────────────────────────────────
-/**
- * Record detection with quality metrics
- */
+// ── VOTING SYSTEM ─────────────────────────────────────────────────────────────
 function recordDetection(cleanText, confidence, quality) {
     recentDetections.push({
         text: cleanText,
@@ -591,21 +549,14 @@ function recordDetection(cleanText, confidence, quality) {
         timestamp: Date.now(),
         quality: quality
     });
-    
-    // Keep buffer bounded
     if (recentDetections.length > OCR_CONFIG.VOTE_WINDOW * 3) {
         recentDetections.shift();
     }
 }
 
-/**
- * Get voted result with confidence scoring
- * Returns { text, confidence, votes } or null
- */
 function getVotedResult() {
     if (recentDetections.length < 2) return null;
     
-    // Count votes by text
     const votes = {};
     const confidences = {};
     
@@ -618,7 +569,6 @@ function getVotedResult() {
         confidences[det.text].push(det.confidence);
     }
     
-    // Find winner
     let bestText = null;
     let bestCount = 0;
     let bestAvgConfidence = 0;
@@ -626,8 +576,6 @@ function getVotedResult() {
     for (const [text, instances] of Object.entries(votes)) {
         const count = instances.length;
         const avgConf = confidences[text].reduce((a, b) => a + b) / count;
-        
-        // Prioritize: valid format > vote count > confidence
         const isValid = isValidPlateFormat(text);
         
         if (count > bestCount || 
@@ -641,7 +589,6 @@ function getVotedResult() {
     
     if (!bestText) return null;
     
-    // Check confidence threshold
     const confidence = bestCount / recentDetections.length;
     
     return {
@@ -653,10 +600,7 @@ function getVotedResult() {
     };
 }
 
-// ── FUZZY MATCHING (Multi-layer) ──────────────────────────────────────────────
-/**
- * Levenshtein distance (edit distance)
- */
+// ── FUZZY MATCHING ────────────────────────────────────────────────────────────
 function levenshteinDistance(a, b) {
     const m = a.length, n = b.length;
     const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
@@ -677,23 +621,18 @@ function levenshteinDistance(a, b) {
     return dp[m][n];
 }
 
-/**
- * Multi-layer fuzzy match: exact → Levenshtein → sliding window → OCR swap
- */
 function isFuzzyMatch(expected, detected) {
     if (!detected || !expected) return false;
     
     const exp = normaliseOCRText(expected);
     const det = normaliseOCRText(detected);
     
-    // 1. Exact or substring match
     if (det.includes(exp) || exp.includes(det)) {
         console.log(`✅ Exact match: "${det}" ~ "${exp}"`);
         return true;
     }
     
-    // 2. Levenshtein distance with plate-length-aware tolerance
-    const maxErrors = Math.ceil(exp.length / 5); // allow ~1 error per 5 chars
+    const maxErrors = Math.ceil(exp.length / 5);
     const dist = levenshteinDistance(exp, det);
     
     if (dist <= maxErrors) {
@@ -701,7 +640,6 @@ function isFuzzyMatch(expected, detected) {
         return true;
     }
     
-    // 3. Sliding window match (detected might have extra chars)
     if (det.length >= exp.length) {
         for (let i = 0; i <= det.length - exp.length; i++) {
             const window = det.substring(i, i + exp.length);
@@ -713,7 +651,6 @@ function isFuzzyMatch(expected, detected) {
         }
     }
     
-    // 4. Character swap recovery (OCR confusions)
     let swapped = det;
     for (const { pattern, replace } of OCR_CORRECTIONS) {
         swapped = swapped.replace(pattern, replace);
@@ -727,10 +664,7 @@ function isFuzzyMatch(expected, detected) {
     return false;
 }
 
-// ── MAIN SCANNING LOOP ────────────────────────────────────────────────────────
-/**
- * Advanced continuous scan with quality checks, confidence scoring, and voting
- */
+// ── SCANNING LOOP ─────────────────────────────────────────────────────────────
 async function continuousScan(videoId, callback, timeoutMs) {
     const video = document.getElementById(videoId);
     const canvas = document.getElementById('snapshot-canvas');
@@ -752,19 +686,41 @@ async function continuousScan(videoId, callback, timeoutMs) {
     recentDetections = [];
     frameStats = { total: 0, successful: 0, skipped: 0, qualityIssues: [] };
     isScanning = true;
+    cameraState.isActive = true;
+    cameraState.reconnectAttempts = 0;
+    
     container.classList.add('scanning');
     statusMsg.textContent = "📷 Position plate in frame...";
     
     const scanStartTime = Date.now();
     let lastSuccessfulRead = null;
     
-    while (isScanning) {
-        await new Promise(r => setTimeout(r, OCR_CONFIG.FRAME_INTERVAL_MS));
-        if (!isScanning) break;
+    // Set freeze detection timeout
+    const resetFreezeDetection = () => {
+        clearTimeout(cameraState.freezeTimeout);
+        cameraState.freezeTimeout = setTimeout(() => {
+            console.warn('⚠️ Camera appears frozen, attempting recovery...');
+            if (statusMsg) statusMsg.textContent = "📷 Recovering camera...";
+            if (isScanning) {
+                continuousScan(videoId, callback, timeoutMs);
+            }
+        }, 5000);
+    };
+    
+    resetFreezeDetection();
+    
+    const cameraLoop = setInterval(async () => {
+        if (!isScanning || !cameraState.isActive) {
+            clearInterval(cameraLoop);
+            clearTimeout(cameraState.freezeTimeout);
+            return;
+        }
         
-        // Timeout check
         if (timeoutMs && (Date.now() - scanStartTime) >= timeoutMs) {
             isScanning = false;
+            cameraState.isActive = false;
+            clearInterval(cameraLoop);
+            clearTimeout(cameraState.freezeTimeout);
             stopCamera();
             container.classList.remove('scanning');
             alert('Scan timed out. Please try again.');
@@ -774,95 +730,104 @@ async function continuousScan(videoId, callback, timeoutMs) {
         
         if (video.readyState !== video.HAVE_ENOUGH_DATA) continue;
         
+        resetFreezeDetection();
         frameStats.total++;
+        cameraState.lastFrameTime = Date.now();
+        
         const remaining = timeoutMs ? Math.max(0, Math.ceil((timeoutMs - (Date.now() - scanStartTime)) / 1000)) : null;
         
         try {
-            // Capture frame
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // ① QUALITY ASSESSMENT
             const quality = assessFrameQuality(canvas);
             
             if (!quality.isGood) {
                 frameStats.skipped++;
-                frameStats.qualityIssues.push({
-                    contrast: quality.contrast,
-                    sharpness: quality.sharpness
-                });
                 statusMsg.textContent = `📷 ${quality.contrast < OCR_CONFIG.MIN_CONTRAST ? 'Improve lighting' : 'Hold steady'}... ${remaining ? `${remaining}s` : ''}`;
-                continue;
+                return;
             }
             
-            // ② PREPROCESS
             const processedCanvas = preprocessPlateImage(canvas);
             
-            // ③ RUN OCR
-            const ocrResult = await tesseractWorker.recognize(processedCanvas);
-            const rawText = ocrResult.data.text;
-            const cleanText = normaliseOCRText(rawText);
-            
-            if (cleanText.length < OCR_CONFIG.PLATE_MIN_LENGTH) {
-                frameStats.skipped++;
-                statusMsg.textContent = `📷 Plate too small... ${remaining ? `${remaining}s` : ''}`;
-                continue;
-            }
-            
-            frameStats.successful++;
-            
-            // ④ CONFIDENCE SCORING
-            const confidence = computeConfidence(ocrResult, cleanText, quality);
-            recordDetection(cleanText, confidence, quality);
-            
-            // ⑤ GET VOTED RESULT
-            const voted = getVotedResult();
-            const displayText = voted ? voted.text : cleanText;
-            lastSuccessfulRead = voted || { text: cleanText, confidence: confidence };
-            
-            // Update UI
-            overlay.textContent = displayText;
-            overlay.style.display = 'block';
-            
-            const voteInfo = voted ? ` [${voted.votes}/${voted.totalFrames} frames]` : '';
-            const confPercent = ((voted?.confidence || confidence) * 100).toFixed(0);
-            
-            statusMsg.textContent = `${remaining ? `[${remaining}s] ` : ''}📸 ${displayText} (${confPercent}%)${voteInfo}`;
-            
-            console.log(`👁 OCR: "${cleanText}" | Voted: "${voted?.text}" | Confidence: ${confidence.toFixed(2)}`);
-            
-            // ⑥ MATCH AGAINST TARGET
-            const shouldMatch = voted ? isFuzzyMatch(targetPlateClean, voted.text) : false;
-            
-            if (shouldMatch && voted && voted.confidence >= OCR_CONFIG.MIN_CONFIDENCE) {
-                isScanning = false;
-                overlay.style.color = '#10b981';
-                overlay.style.borderColor = '#10b981';
-                statusMsg.textContent = "✅ Plate Matched! Validating...";
+            if (!cameraState.isScanningFrame) {
+                cameraState.isScanningFrame = true;
                 
-                setTimeout(() => {
-                    container.classList.remove('scanning');
-                    statusMsg.textContent = "🚗 Gate Opening...";
-                    
-                    setTimeout(() => {
-                        stopCamera();
-                        console.log(`📊 Scan Stats:`, frameStats);
-                        callback(lastSuccessfulRead);
-                    }, 1500);
-                }, 1000);
+                tesseractWorker.recognize(processedCanvas)
+                    .then(ocrResult => {
+                        try {
+                            const rawText = ocrResult.data.text;
+                            const cleanText = normaliseOCRText(rawText);
+                            
+                            if (cleanText.length < OCR_CONFIG.PLATE_MIN_LENGTH) {
+                                frameStats.skipped++;
+                                cameraState.isScanningFrame = false;
+                                return;
+                            }
+                            
+                            frameStats.successful++;
+                            
+                            const confidence = computeConfidence(ocrResult, cleanText, quality);
+                            recordDetection(cleanText, confidence, quality);
+                            
+                            const voted = getVotedResult();
+                            const displayText = voted ? voted.text : cleanText;
+                            lastSuccessfulRead = voted || { text: cleanText, confidence: confidence };
+                            
+                            overlay.textContent = displayText;
+                            overlay.style.display = 'block';
+                            
+                            const voteInfo = voted ? ` [${voted.votes}/${voted.totalFrames} frames]` : '';
+                            const confPercent = ((voted?.confidence || confidence) * 100).toFixed(0);
+                            
+                            statusMsg.textContent = `${remaining ? `[${remaining}s] ` : ''}📸 ${displayText} (${confPercent}%)${voteInfo}`;
+                            
+                            console.log(`👁 OCR: "${cleanText}" | Voted: "${voted?.text}" | Confidence: ${confidence.toFixed(2)}`);
+                            
+                            const shouldMatch = voted ? isFuzzyMatch(targetPlateClean, voted.text) : false;
+                            
+                            if (shouldMatch && voted && voted.confidence >= OCR_CONFIG.MIN_CONFIDENCE) {
+                                isScanning = false;
+                                cameraState.isActive = false;
+                                clearInterval(cameraLoop);
+                                clearTimeout(cameraState.freezeTimeout);
+                                
+                                overlay.style.color = '#10b981';
+                                overlay.style.borderColor = '#10b981';
+                                statusMsg.textContent = "✅ Plate Matched! Validating...";
+                                
+                                setTimeout(() => {
+                                    container.classList.remove('scanning');
+                                    statusMsg.textContent = "🚗 Gate Opening...";
+                                    
+                                    setTimeout(() => {
+                                        stopCamera();
+                                        console.log(`📊 Scan Stats:`, frameStats);
+                                        callback(lastSuccessfulRead);
+                                    }, 1500);
+                                }, 1000);
+                            }
+                        } catch (err) {
+                            console.error('❌ OCR processing error:', err);
+                        } finally {
+                            cameraState.isScanningFrame = false;
+                        }
+                    })
+                    .catch(err => {
+                        console.warn('⚠️ OCR failed (will retry next frame):', err);
+                        cameraState.isScanningFrame = false;
+                        frameStats.skipped++;
+                    });
             }
         } catch (err) {
-            console.warn("⚠️  Frame OCR failed:", err);
+            console.warn("❌ Frame capture failed:", err);
             frameStats.skipped++;
         }
-    }
+    }, OCR_CONFIG.FRAME_INTERVAL_MS);
 }
 
-// ── INITIALIZATION ────────────────────────────────────────────────────────────
-/**
- * Initialize Tesseract worker with optimal settings for license plates
- */
+// ── TESSERACT INIT ────────────────────────────────────────────────────────────
 (async () => {
     try {
         if (typeof Tesseract === 'undefined') {
@@ -872,8 +837,6 @@ async function continuousScan(videoId, callback, timeoutMs) {
         
         tesseractWorker = await Tesseract.createWorker('eng');
         
-        // PSM 7 = treat as single text line (optimal for plates)
-        // OEM 1 = LSTM neural net (most accurate)
         await tesseractWorker.setParameters({
             tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
             tessedit_ocr_engine_mode: Tesseract.OEM.LSTM_ONLY,
@@ -882,7 +845,6 @@ async function continuousScan(videoId, callback, timeoutMs) {
         });
         
         console.log('✅ Tesseract OCR Initialized (Advanced)');
-        console.log(`   └─ PSM: Single Line | OEM: LSTM | Whitelist: A-Z 0-9`);
     } catch (err) {
         console.error('❌ Tesseract initialization failed:', err);
     }
@@ -893,37 +855,78 @@ let currentStream = null;
 
 async function startCamera(videoId) {
     try {
+        console.log(`🎥 Starting camera for ${videoId}...`);
+        
         let stream;
         try {
-            // Prefer rear/environment camera (for mobile)
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { exact: 'environment' } }
+                video: {
+                    facingMode: { exact: 'environment' },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
             });
         } catch (e) {
-            // Fallback to any camera
-            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            console.warn('⚠️ Rear camera not available, trying any camera...');
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
         }
         
         const videoElement = document.getElementById(videoId);
         videoElement.srcObject = stream;
         currentStream = stream;
+        cameraState.isActive = true;
+        cameraState.reconnectAttempts = 0;
+        
+        console.log(`✅ Camera started: ${videoId}`);
+        
+        stream.getTracks().forEach(track => {
+            track.onended = () => {
+                console.warn('⚠️ Camera track ended');
+                cameraState.isActive = false;
+                if (isScanning) {
+                    console.log('🔄 Attempting to restart camera...');
+                    cameraState.reconnectAttempts++;
+                    if (cameraState.reconnectAttempts < cameraState.maxReconnectAttempts) {
+                        setTimeout(() => startCamera(videoId), 1000);
+                    }
+                }
+            };
+        });
+        
     } catch (err) {
-        console.error("❌ Camera access denied:", err);
-        alert("Camera access required for plate detection");
+        console.error("❌ Camera access failed:", err);
+        const statusMsg = document.getElementById(`${videoId.split('-')[0]}-status`);
+        if (statusMsg) {
+            statusMsg.textContent = "❌ Camera access denied. Please allow camera access.";
+        }
+        alert("Camera access required for plate detection.\n\nPlease:\n1. Go to Settings\n2. Find this app\n3. Enable Camera permission");
     }
 }
 
 function stopCamera() {
+    cameraState.isActive = false;
+    isScanning = false;
+    clearTimeout(cameraState.freezeTimeout);
+    
     if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
+        currentStream.getTracks().forEach(track => {
+            try {
+                track.stop();
+            } catch (e) {
+                console.warn('⚠️ Error stopping camera track:', e);
+            }
+        });
         currentStream = null;
     }
+    
+    console.log('✅ Camera stopped cleanly');
 }
 
-// ── DEBUG UTILITIES ───────────────────────────────────────────────────────────
-/**
- * Export scan statistics to console
- */
 function getScanStats() {
     const voted = getVotedResult();
     return {
@@ -969,7 +972,7 @@ function goBack(currentId, prevId) {
     showScreen(prevId);
 }
 
-// Inline error banner helper for the registration form
+// Inline error banner helper
 function showRegisterError(msg) {
     let banner = document.getElementById('register-block-error');
     if (!banner) {
@@ -989,7 +992,6 @@ function showRegisterError(msg) {
             gap: 10px;
             animation: fadeIn 0.3s ease;
         `;
-        // Insert before the submit button
         const submitBtn = registerForm.querySelector('button[type="submit"]');
         registerForm.insertBefore(banner, submitBtn);
     }
@@ -1003,7 +1005,7 @@ function hideRegisterError() {
 }
 
 // =============================================
-// AUTO-SUBMIT: fire when all fields + spot ready
+// AUTO-SUBMIT
 // =============================================
 let _autoSubmitTimer = null;
 
@@ -1020,20 +1022,17 @@ function checkAutoSubmit() {
     const allFilled = name && flat && phone && plate && spot;
 
     if (allFilled) {
-        // Show the "ready" state on the button
         btn.classList.add('btn-ready');
         btn.textContent = '✓ All set — Generating OTP…';
-        btn.disabled = false; // ensure clickable
+        btn.disabled = false;
 
-        // Auto-fire after a short pause so visitor can see the state
         clearTimeout(_autoSubmitTimer);
         _autoSubmitTimer = setTimeout(() => {
-            if (visitorData.selectedSpot) {   // re-check spot still set
+            if (visitorData.selectedSpot) {
                 registerForm.requestSubmit();
             }
         }, 600);
     } else {
-        // Revert button to normal if something gets cleared
         clearTimeout(_autoSubmitTimer);
         btn.classList.remove('btn-ready');
         btn.textContent = 'Generate OTP';
@@ -1041,7 +1040,6 @@ function checkAutoSubmit() {
     }
 }
 
-// Wire auto-submit check to every form field
 ['name', 'visiting-flat', 'phone', 'license-plate'].forEach(fieldId => {
     const el = document.getElementById(fieldId);
     if (el) el.addEventListener('input', checkAutoSubmit);
@@ -1052,21 +1050,18 @@ registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideRegisterError();
 
-    // ── SPOT REQUIRED CHECK ───────────────────────
     if (!visitorData.selectedSpot) {
         showRegisterError(
             'Please select a parking spot first — use the <strong>Normal</strong> or <strong>Access ♿</strong> buttons at the top.'
         );
-        // Shake both top-bar buttons to point the visitor's attention there
         ['btn-normal-spots', 'btn-accessibility'].forEach(id => {
             const btn = document.getElementById(id);
             if (!btn) return;
             btn.classList.remove('shake-attention');
-            void btn.offsetWidth; // reflow to re-trigger
+            void btn.offsetWidth;
             btn.classList.add('shake-attention');
             btn.addEventListener('animationend', () => btn.classList.remove('shake-attention'), { once: true });
         });
-        // Also highlight the lot-wrapper placeholder as an error
         const wrapper = document.getElementById('visitor-lot-wrapper');
         if (wrapper) {
             wrapper.classList.add('spot-required-error');
@@ -1074,7 +1069,6 @@ registerForm.addEventListener('submit', async (e) => {
         }
         return;
     }
-    // ─────────────────────────────────────────────
 
     const rawPlate = document.getElementById('license-plate').value.toUpperCase();
 
@@ -1088,7 +1082,6 @@ registerForm.addEventListener('submit', async (e) => {
     visitorData.visitingFlat = document.getElementById('visiting-flat').value.toUpperCase();
     visitorData.estimatedHours = selectedHours;
 
-    // ── BLOCK CHECK ──────────────────────────────
     try {
         const blockRes = await fetch(
             `/api/blocked-visitors/check?flatId=${encodeURIComponent(visitorData.visitingFlat)}&phone=${encodeURIComponent(visitorData.phone)}`
@@ -1102,15 +1095,12 @@ registerForm.addEventListener('submit', async (e) => {
             );
             btn.disabled = false;
             btn.textContent = 'Generate OTP';
-            return; // Stop here — no OTP sent
+            return;
         }
     } catch (err) {
-        // If the check fails due to network, we log it but don't block the visitor
         console.warn('Block-check failed, proceeding:', err);
     }
-    // ─────────────────────────────────────────────
 
-    // ── ACTIVE CHECK ──────────────────────────────
     try {
         const dupRes = await fetch('/api/check-active', {
             method: 'POST',
@@ -1123,19 +1113,16 @@ registerForm.addEventListener('submit', async (e) => {
             showRegisterError(dupData.message);
             btn.disabled = false;
             btn.textContent = 'Generate OTP';
-            return; // Stop here — no OTP sent
+            return;
         }
     } catch (err) {
         console.warn('Duplicate-check failed, proceeding:', err);
     }
-    // ─────────────────────────────────────────────
 
-    // ── RESIDENT AVAILABILITY CHECK ──────────────
     try {
         const residentsRes = await fetch('/api/residents');
         const residents = await residentsRes.json();
 
-        // Find resident(s) for the visiting flat
         const residentForFlat = residents.find(r =>
             r.baseFlatId && r.baseFlatId.toUpperCase() === visitorData.visitingFlat.toUpperCase()
         );
@@ -1147,12 +1134,11 @@ registerForm.addEventListener('submit', async (e) => {
             );
             btn.disabled = false;
             btn.textContent = 'Generate OTP';
-            return; // Stop here — no OTP sent
+            return;
         }
     } catch (err) {
         console.warn('Availability-check failed, proceeding:', err);
     }
-    // ─────────────────────────────────────────────
 
     btn.textContent = 'Sending OTP...';
 
@@ -1203,10 +1189,6 @@ otpInputs.forEach((input, index) => {
     });
 });
 
-// 2. OTP Submit -> Spot Allocation
-// 3. Entry Camera Scan
-
-// Start checking when OTP verified
 let pendingRequestId = null;
 let approvalPollInterval = null;
 
@@ -1226,7 +1208,6 @@ otpForm.addEventListener('submit', async (e) => {
         const data = await res.json();
 
         if (data.success) {
-            // OTP verified — now create a visitor request for the resident
             try {
                 const reqRes = await fetch('/api/visitor-requests', {
                     method: 'POST',
@@ -1245,7 +1226,6 @@ otpForm.addEventListener('submit', async (e) => {
                     document.getElementById('waiting-flat-display').textContent = visitorData.visitingFlat;
                     showScreen('screen-waiting');
 
-                    // Start polling for approval
                     startApprovalPolling();
                 } else {
                     console.error('[Visitor Request Error]', reqData);
@@ -1282,12 +1262,8 @@ function startApprovalPolling() {
                 approvalPollInterval = null;
                 statusMsg.textContent = 'Approved! Please proceed to the gate.';
 
-                // Go straight to waiting for admin to open gate
                 setTimeout(() => {
                     showScreen('screen-admin-wait');
-                    // We also start polling for the admin to OPEN the gate
-                    // Note: We don't trigger the notification here anymore,
-                    // because the ADMIN CAMERA will trigger it when it scans the car.
                     pollAdminGateAction();
                 }, 1500);
             } else if (data.status === 'rejected') {
@@ -1295,11 +1271,10 @@ function startApprovalPolling() {
                 approvalPollInterval = null;
                 showScreen('screen-denied');
             }
-            // else still 'pending', keep polling
         } catch (err) {
             console.error('Polling error', err);
         }
-    }, 3000); // Poll every 3 seconds
+    }, 3000);
 }
 
 function cancelWaiting() {
@@ -1310,8 +1285,6 @@ function cancelWaiting() {
     pendingRequestId = null;
     resetApp();
 }
-
-// ── ADMIN ACCESS REQUEST (After Plate Match) ──────────────────
 
 async function requestAdminAccess() {
     showScreen('screen-admin-wait');
@@ -1350,7 +1323,6 @@ async function requestAdminAccess() {
 }
 
 function pollAdminGateAction(notifId) {
-    // If notifId is not provided, we poll by the global pendingRequestId
     const idStr = notifId ? String(notifId) : null;
     const pollUrl = idStr
         ? `/api/gate-notifications/${idStr}/status`
@@ -1370,9 +1342,8 @@ function pollAdminGateAction(notifId) {
         } catch (err) {
             console.error('Action poll error', err);
         }
-    }, 2000); // Poll admin action every 2s
+    }, 2000);
 
-    // Safeguard: Stop polling after 4 minutes to avoid battery drain if something is stuck
     setTimeout(() => {
         if (pollInterval) {
             clearInterval(pollInterval);
@@ -1380,8 +1351,6 @@ function pollAdminGateAction(notifId) {
         }
     }, 4 * 60 * 1000);
 }
-
-// 4. Active Parking
 
 let parkingTimer = null;
 
@@ -1391,19 +1360,15 @@ function startParking() {
     visitorData.id = Date.now().toString() + spotSuffix;
     visitorData.ratePerHour = getRate();
 
-    // Save to local storage array for the admin dashboard
     saveToStorage(visitorData);
 
-    // Update UI
     document.getElementById('active-plate').textContent = visitorData.licensePlate;
     document.getElementById('entry-time-display').textContent = visitorData.entryTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Render selected-spot minimap (if visitor chose one)
     _updateActiveParkingSpot();
 
     showScreen('screen-active');
 
-    // Start Timer
     updateTimer();
     parkingTimer = setInterval(updateTimer, 1000);
 }
@@ -1424,14 +1389,12 @@ function updateTimer() {
 
     document.getElementById('time-elapsed').textContent = formattedTime;
 
-    // Calculate charge
     const exactHours = diffMs / 3600000;
     visitorData.totalCharge = Math.max(exactHours * visitorData.ratePerHour, 0);
 
     document.getElementById('current-charge').textContent = '₹' + visitorData.totalCharge.toFixed(2);
 }
 
-// 5. Automatic Exit on plate detection
 function handleAutoExit() {
     clearInterval(parkingTimer);
     stopCamera();
@@ -1442,7 +1405,6 @@ function handleAutoExit() {
 }
 
 function updateFinalReceipt() {
-    // Ensure dates are proper Date objects
     const entry = new Date(visitorData.entryTime);
     const exit = new Date(visitorData.exitTime);
     const diffMs = exit.getTime() - entry.getTime();
@@ -1452,15 +1414,13 @@ function updateFinalReceipt() {
     const exactHours = diffMs / 3600000;
     const baseCharge = Math.max(exactHours * visitorData.ratePerHour, 0);
 
-    // Calculate fine if exceeded estimated time
     const estimatedMs = (visitorData.estimatedHours || 4) * 3600000;
-    const FINE_AMOUNT = parseInt(localStorage.getItem('smartpark_fine_amount')) || 50; // Get from admin settings
+    const FINE_AMOUNT = parseInt(localStorage.getItem('smartpark_fine_amount')) || 50;
     const exceedsFine = diffMs > estimatedMs ? FINE_AMOUNT : 0;
     const finalCharge = baseCharge + exceedsFine;
 
     visitorData.totalCharge = finalCharge;
 
-    // Update local storage with final metrics
     updateStorage(visitorData);
 
     const diffHrs = Math.floor(diffMs / 3600000);
@@ -1473,7 +1433,6 @@ function updateFinalReceipt() {
     document.getElementById('receipt-exit').textContent = exit.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     document.getElementById('receipt-duration').textContent = `${diffHrs}h ${diffMins}m ${diffSecs}s`;
 
-    // Display charges with fine breakdown if applicable
     let chargeDisplay = `₹${baseCharge.toFixed(2)}`;
     if (exceedsFine > 0) {
         chargeDisplay += ` + ₹${FINE_AMOUNT} (fine) = ₹${finalCharge.toFixed(2)}`;
@@ -1488,8 +1447,7 @@ function resetApp() {
 // =============================================
 // PARKING SPOTS MODAL
 // =============================================
-// Track which spot the visitor has chosen (cleared on reset)
-let _pendingSpot = null; // { label, type, emoji }
+let _pendingSpot = null;
 
 async function showParkingModal(type) {
     const overlay = document.getElementById('pm-overlay');
@@ -1498,10 +1456,8 @@ async function showParkingModal(type) {
     const icon = document.getElementById('pm-icon');
     const stats = document.getElementById('pm-stats');
 
-    // Clear any old selection banner
     _clearSpotSelectionBanner();
 
-    // Fetch live visitor data
     let activeVisitors = [];
     try {
         const res = await fetch('/api/visitors');
@@ -1512,11 +1468,10 @@ async function showParkingModal(type) {
             if (v.exitTime) return false;
             return (now - new Date(v.entryTime).getTime()) <= ONE_DAY;
         });
-    } catch (e) { /* offline — show empty */ }
+    } catch (e) { /* offline */ }
 
     const total = parseInt(localStorage.getItem('smartpark_total_parking') || '50');
 
-    // SYNC WITH ADMIN LOT: Distribute total spots across 3 rows (A, B, C)
     const rowA = Math.ceil(total / 3);
     const rowB = Math.ceil((total - rowA) / 2);
     const rowC = total - rowA - rowB;
@@ -1533,7 +1488,7 @@ async function showParkingModal(type) {
     const allSpots = [];
     rows.forEach(r => {
         for (let i = 0; i < r.count; i++) {
-            const isWheelchair = (i === 0); // first spot of every row is wheelchair accessible
+            const isWheelchair = (i === 0);
             const label = `${r.prefix}${String(i + 1).padStart(2, '0')}`;
 
             let visitor = activeVisitors.find(v => v.id && v.id.includes('-') && v.id.split('-')[1] === label);
@@ -1589,35 +1544,24 @@ async function showParkingModal(type) {
         grid.appendChild(spot);
     });
 
-    // If there is already a selected spot, show its confirmation banner
     if (visitorData.selectedSpot) {
         _renderSpotSelectionBanner(visitorData.selectedSpot.label, visitorData.selectedSpot.emoji);
     }
 
-    // Trap scroll
     document.body.style.overflow = 'hidden';
 }
 
-
-/**
- * Called when visitor taps a free spot in the modal.
- */
 function _onSpotPicked(spotEl, label, type, emoji, grid) {
-    // Deselect all in grid
     grid.querySelectorAll('.pm-spot.selected').forEach(el => el.classList.remove('selected'));
     spotEl.classList.add('selected');
 
-    // Persist choice
     _pendingSpot = { label, type, emoji };
     visitorData.selectedSpot = { label, type, emoji };
 
-    // Show/update confirmation banner inside the modal
     _renderSpotSelectionBanner(label, emoji);
 
-    // Also update the vl-your-spot-label if active screen is visible
     _updateActiveParkingSpot();
 
-    // Trigger auto-submit check — might fire OTP generation automatically
     checkAutoSubmit();
 }
 
@@ -1628,7 +1572,6 @@ function _renderSpotSelectionBanner(label, emoji) {
         banner = document.createElement('div');
         banner.id = 'pm-spot-selection-banner';
         banner.className = 'pm-selection-banner';
-        // Insert before the road bar at the bottom
         const road = modal.querySelector('.pm-road');
         modal.insertBefore(banner, road);
     }
@@ -1648,17 +1591,12 @@ function _clearSpotSelectionBanner() {
 function _clearSpotSelection() {
     visitorData.selectedSpot = null;
     _pendingSpot = null;
-    // Deselect all tiles
     document.querySelectorAll('.pm-spot.selected').forEach(el => el.classList.remove('selected'));
     _clearSpotSelectionBanner();
     _updateActiveParkingSpot();
-    // Revert button state & cancel any pending auto-submit
     checkAutoSubmit();
 }
 
-/**
- * Reflects the chosen spot on the Active Parking screen minimap.
- */
 function _updateActiveParkingSpot() {
     const label = document.getElementById('vl-your-spot-label');
     const wrapper = document.getElementById('visitor-lot-wrapper');
@@ -1668,7 +1606,6 @@ function _updateActiveParkingSpot() {
         const { label: spotId, emoji } = visitorData.selectedSpot;
         label.innerHTML = `${emoji} Your reserved spot: <strong>${spotId}</strong>`;
         label.style.display = 'block';
-        // Render mini-map with selected spot highlighted
         _renderActiveLotMap(spotId, wrapper);
     } else {
         label.textContent = '';
@@ -1677,15 +1614,10 @@ function _updateActiveParkingSpot() {
     }
 }
 
-/**
- * Renders a compact minimap on the Active Parking screen showing the lot
- * with the visitor's chosen spot highlighted.
- */
 function _renderActiveLotMap(chosenSpotId, wrapper) {
     if (!wrapper) return;
     const total = parseInt(localStorage.getItem('smartpark_total_parking') || '50');
 
-    // Distribute total spots across 3 rows (A, B, C) to match admin mapping
     const rowA = Math.ceil(total / 3);
     const rowB = Math.ceil((total - rowA) / 2);
     const rowC = total - rowA - rowB;
@@ -1702,7 +1634,6 @@ function _renderActiveLotMap(chosenSpotId, wrapper) {
         }
     });
 
-    // Keep road label + dash, replace the rest
     wrapper.innerHTML = `
         <div class="vl-road">
             <span class="vl-road-label">&#8594; ENTRANCE</span>
@@ -1727,9 +1658,10 @@ function _renderActiveLotMap(chosenSpotId, wrapper) {
 }
 
 function closeParkingModal(e) {
-    // Close only when clicking the backdrop (not the modal itself)
     if (e && e.target !== document.getElementById('pm-overlay')) return;
     const overlay = document.getElementById('pm-overlay');
     overlay.classList.remove('open');
     document.body.style.overflow = '';
 }
+
+console.log('✅ app.js loaded successfully');
