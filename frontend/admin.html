@@ -248,7 +248,8 @@
                     <label for="password">Password</label>
                     <div class="password-input-wrapper">
                         <input type="password" id="password" required placeholder="Enter password">
-                        <button type="button" class="password-toggle-btn" id="password-toggle" title="Show/hide password">
+                        <button type="button" class="password-toggle-btn" id="password-toggle"
+                            title="Show/hide password">
                             👁️
                         </button>
                     </div>
@@ -263,8 +264,52 @@
                     style="color: var(--danger); display: none; margin-bottom: 15px; min-height: 0;">Invalid username or
                     password.</div>
                 <button type="submit" class="btn btn-primary">Login to Dashboard</button>
+                <div style="text-align: center; margin-top: 15px;">
+                    <span style="color: var(--text-muted); font-size: 14px;">New admin?</span>
+                    <a href="#" class="btn btn-text" id="goto-register-link"
+                        style="padding: 0; font-size: 14px; text-decoration: underline; width: auto; display: inline; margin-left: 5px;">Register
+                        here</a>
+                </div>
                 <a href="index.html" class="btn btn-text"
-                    style="display: block; text-align: center; text-decoration: none;">Go to Visitor Gate</a>
+                    style="display: block; text-align: center; text-decoration: none; margin-top: 10px;">Go to Visitor
+                    Gate</a>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== REGISTER SCREEN ===== -->
+    <div id="screen-register" class="login-wrapper auth-screen">
+        <div class="login-card">
+            <div class="admin-logo">
+                <img src="logo.png" alt="SmartParkk Logo" style="width: 64px; height: 64px;">
+            </div>
+            <div class="header">
+                <h1>Admin <span class="highlight">Registration</span></h1>
+                <p>Create a new admin account</p>
+            </div>
+            <form id="register-form">
+                <div class="input-group">
+                    <label for="reg-username">Username</label>
+                    <input type="text" id="reg-username" required placeholder="Create username">
+                </div>
+                <div class="input-group">
+                    <label for="reg-password">Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="reg-password" required placeholder="Create password">
+                        <button type="button" class="password-toggle-btn" id="reg-password-toggle"
+                            title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="reg-phone">Phone Number</label>
+                    <input type="text" id="reg-phone" required placeholder="Enter 10-digit phone number">
+                </div>
+                <div class="status-msg" id="register-msg"
+                    style="display: none; margin-bottom: 15px; min-height: 0; font-size: 14px;"></div>
+                <button type="submit" class="btn btn-primary">Create Account</button>
+                <button type="button" class="btn btn-text" id="register-back-login">Back to Login</button>
             </form>
         </div>
     </div>
@@ -323,7 +368,8 @@
                     <label for="new-password">New Password</label>
                     <div class="password-input-wrapper">
                         <input type="password" id="new-password" required placeholder="Enter new password">
-                        <button type="button" class="password-toggle-btn" id="new-password-toggle" title="Show/hide password">
+                        <button type="button" class="password-toggle-btn" id="new-password-toggle"
+                            title="Show/hide password">
                             👁️
                         </button>
                     </div>
@@ -332,7 +378,8 @@
                     <label for="confirm-password">Confirm Password</label>
                     <div class="password-input-wrapper">
                         <input type="password" id="confirm-password" required placeholder="Confirm new password">
-                        <button type="button" class="password-toggle-btn" id="confirm-password-toggle" title="Show/hide password">
+                        <button type="button" class="password-toggle-btn" id="confirm-password-toggle"
+                            title="Show/hide password">
                             👁️
                         </button>
                     </div>
@@ -799,36 +846,6 @@
     </div>
 
     <script src="https://unpkg.com/tesseract.js@v5.0.3/dist/tesseract.min.js"></script>
-    <script>
-        // ===== PASSWORD VISIBILITY TOGGLE FEATURE =====
-        function initPasswordToggle(inputId, toggleId) {
-            const inputEl = document.getElementById(inputId);
-            const toggleBtn = document.getElementById(toggleId);
-
-            if (!inputEl || !toggleBtn) return;
-
-            toggleBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-
-                if (inputEl.type === 'password') {
-                    inputEl.type = 'text';
-                    toggleBtn.textContent = '🙈'; // Eye closed icon
-                    toggleBtn.title = 'Hide password';
-                } else {
-                    inputEl.type = 'password';
-                    toggleBtn.textContent = '👁️'; // Eye open icon
-                    toggleBtn.title = 'Show password';
-                }
-            });
-        }
-
-        // Initialize all password toggles on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            initPasswordToggle('password', 'password-toggle');
-            initPasswordToggle('new-password', 'new-password-toggle');
-            initPasswordToggle('confirm-password', 'confirm-password-toggle');
-        });
-    </script>
     <script src="js/admin.js"></script>
 
     <!-- Gate Notification Banner (injected by JS, but styles defined here) -->
