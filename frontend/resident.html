@@ -64,6 +64,58 @@
         .password-toggle-btn:hover {
             color: var(--primary);
         }
+
+        /* Password Requirements Box */
+        .password-requirements {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        .requirement-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+        }
+
+        .requirement-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .requirement-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .requirement-icon.unchecked {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+        }
+
+        .requirement-icon.checked {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .requirement-text.checked {
+            color: #10b981;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 
@@ -166,6 +218,20 @@
                                 👁️
                             </button>
                         </div>
+                        <div class="password-requirements">
+                            <div class="requirement-item">
+                                <span class="requirement-icon unchecked" id="req-length-icon">✓</span>
+                                <span class="requirement-text" id="req-length">Minimum 8 characters</span>
+                            </div>
+                            <div class="requirement-item">
+                                <span class="requirement-icon unchecked" id="req-uppercase-icon">✓</span>
+                                <span class="requirement-text" id="req-uppercase">At least one uppercase letter (A-Z)</span>
+                            </div>
+                            <div class="requirement-item">
+                                <span class="requirement-icon unchecked" id="req-special-icon">✓</span>
+                                <span class="requirement-text" id="req-special">At least one special character (!@#$%^&*)</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="input-group">
                         <label for="reset-confirm-password">Confirm Password</label>
@@ -179,7 +245,7 @@
                     <div class="status-msg" id="resident-reset-error"
                         style="color: var(--danger); display: none; margin-bottom: 15px; min-height: 0;">Passwords do
                         not match!</div>
-                    <button type="submit" class="btn btn-primary">Save New Password</button>
+                    <button type="submit" class="btn btn-primary" id="reset-submit-btn">Save New Password</button>
                     <button type="button" class="btn btn-text" onclick="showScreen('screen-login')">Cancel</button>
                 </form>
             </div>
@@ -225,8 +291,22 @@
                                 👁️
                             </button>
                         </div>
+                        <div class="password-requirements">
+                            <div class="requirement-item">
+                                <span class="requirement-icon unchecked" id="reg-req-length-icon">✓</span>
+                                <span class="requirement-text" id="reg-req-length">Minimum 8 characters</span>
+                            </div>
+                            <div class="requirement-item">
+                                <span class="requirement-icon unchecked" id="reg-req-uppercase-icon">✓</span>
+                                <span class="requirement-text" id="reg-req-uppercase">At least one uppercase letter (A-Z)</span>
+                            </div>
+                            <div class="requirement-item">
+                                <span class="requirement-icon unchecked" id="reg-req-special-icon">✓</span>
+                                <span class="requirement-text" id="reg-req-special">At least one special character (!@#$%^&*)</span>
+                            </div>
+                        </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Register</button>
+                    <button type="submit" class="btn btn-primary" id="register-submit-btn">Register</button>
                     <button type="button" class="btn btn-text" onclick="showScreen('screen-login')">Already registered?
                         Login</button>
                 </form>
@@ -242,8 +322,6 @@
                             style="font-size: 12px; margin-left: 5px; padding: 2px 6px; border-radius: 4px; background-color: var(--primary); color: white; display: none;"></span>
                     </p>
                 </div>
-
-
 
                 <div class="parking-details"
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -292,54 +370,6 @@
                 <button type="button" class="btn btn-danger" onclick="logoutResident()">Logout</button>
             </div>
         </section>
-    </div>
-
-    <!-- Block Confirmation Modal -->
-    <div id="block-modal-overlay"
-        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); z-index:2000; justify-content:center; align-items:center; padding:20px;">
-        <div
-            style="background:#1e293b; border:1px solid rgba(255,255,255,0.12); border-radius:20px; padding:28px; max-width:380px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.5); animation: modalPop 0.25s cubic-bezier(0.34,1.56,0.64,1) both;">
-            <div style="text-align:center; margin-bottom:20px;">
-                <div id="block-modal-icon"
-                    style="width:56px; height:56px; border-radius:50%; background:rgba(239,68,68,0.15); color:#ef4444; display:flex; align-items:center; justify-content:center; font-size:26px; margin:0 auto 14px;">
-                    🚫</div>
-                <h3 id="block-modal-title" style="font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:6px;">
-                    Block Visitor?</h3>
-                <p id="block-modal-desc" style="font-size:14px; color:#94a3b8; line-height:1.5;"></p>
-            </div>
-            <div style="display:flex; gap:10px;">
-                <button id="block-modal-cancel" onclick="closeBlockModal()"
-                    style="flex:1; padding:13px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; background:transparent; color:#94a3b8; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">Cancel</button>
-                <button id="block-modal-confirm" onclick="confirmBlockAction()"
-                    style="flex:1; padding:13px; border:none; border-radius:10px; background:var(--danger); color:white; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">Block</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Vehicles Modal -->
-    <div id="edit-vehicles-modal-overlay"
-        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); z-index:2000; justify-content:center; align-items:center; padding:20px;">
-        <div
-            style="background:#1e293b; border:1px solid rgba(255,255,255,0.12); border-radius:20px; padding:28px; max-width:380px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.5); animation: modalPop 0.25s cubic-bezier(0.34,1.56,0.64,1) both;">
-            <div style="text-align:center; margin-bottom:20px;">
-                <h3 style="font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:6px;">Edit Vehicles</h3>
-                <p style="font-size:14px; color:#94a3b8; line-height:1.5;">Update your registered number plates</p>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-                <input type="text" id="edit-car-1" placeholder="Plate 1"
-                    style="width: 100%; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; color: white; text-transform: uppercase;">
-                <input type="text" id="edit-car-2" placeholder="Plate 2"
-                    style="width: 100%; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; color: white; text-transform: uppercase;">
-                <input type="text" id="edit-car-3" placeholder="Plate 3"
-                    style="width: 100%; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; color: white; text-transform: uppercase;">
-            </div>
-            <div style="display:flex; gap:10px;">
-                <button onclick="closeEditVehiclesModal()"
-                    style="flex:1; padding:13px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; background:transparent; color:#94a3b8; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">Cancel</button>
-                <button id="edit-vehicles-confirm" onclick="saveVehicles()"
-                    style="flex:1; padding:13px; border:none; border-radius:10px; background:var(--primary); color:white; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">Save</button>
-            </div>
-        </div>
     </div>
 
     <style>
@@ -422,23 +452,148 @@
 
                 if (inputEl.type === 'password') {
                     inputEl.type = 'text';
-                    toggleBtn.textContent = '🙈'; // Eye closed icon
+                    toggleBtn.textContent = '🙈';
                     toggleBtn.title = 'Hide password';
                 } else {
                     inputEl.type = 'password';
-                    toggleBtn.textContent = '👁️'; // Eye open icon
+                    toggleBtn.textContent = '👁️';
                     toggleBtn.title = 'Show password';
                 }
             });
         }
 
-        // Initialize all password toggles on page load
+        // ===== PASSWORD VALIDATION FEATURE =====
+        function validatePasswordStrength(password) {
+            const requirements = {
+                length: password.length >= 8,
+                uppercase: /[A-Z]/.test(password),
+                special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+            };
+            return requirements;
+        }
+
+        function updatePasswordRequirements(inputId, prefixId = '') {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            const password = input.value;
+            const reqs = validatePasswordStrength(password);
+
+            const lengthIcon = document.getElementById(prefixId + 'req-length-icon');
+            const uppercaseIcon = document.getElementById(prefixId + 'req-uppercase-icon');
+            const specialIcon = document.getElementById(prefixId + 'req-special-icon');
+
+            const lengthText = document.getElementById(prefixId + 'req-length');
+            const uppercaseText = document.getElementById(prefixId + 'req-uppercase');
+            const specialText = document.getElementById(prefixId + 'req-special');
+
+            if (lengthIcon) {
+                lengthIcon.className = reqs.length ? 'requirement-icon checked' : 'requirement-icon unchecked';
+                lengthText.className = reqs.length ? 'requirement-text checked' : 'requirement-text';
+            }
+
+            if (uppercaseIcon) {
+                uppercaseIcon.className = reqs.uppercase ? 'requirement-icon checked' : 'requirement-icon unchecked';
+                uppercaseText.className = reqs.uppercase ? 'requirement-text checked' : 'requirement-text';
+            }
+
+            if (specialIcon) {
+                specialIcon.className = reqs.special ? 'requirement-icon checked' : 'requirement-icon unchecked';
+                specialText.className = reqs.special ? 'requirement-text checked' : 'requirement-text';
+            }
+
+            return Object.values(reqs).every(v => v);
+        }
+
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
             initPasswordToggle('login-password', 'login-password-toggle');
             initPasswordToggle('reset-password', 'reset-password-toggle');
             initPasswordToggle('reset-confirm-password', 'reset-confirm-password-toggle');
             initPasswordToggle('reg-password', 'reg-password-toggle');
+
+            // Reset password validation
+            const resetPasswordInput = document.getElementById('reset-password');
+            if (resetPasswordInput) {
+                resetPasswordInput.addEventListener('input', () => {
+                    const isValid = updatePasswordRequirements('reset-password', '');
+                    const submitBtn = document.getElementById('reset-submit-btn');
+                    if (submitBtn) submitBtn.disabled = !isValid;
+                });
+            }
+
+            // Register password validation
+            const regPasswordInput = document.getElementById('reg-password');
+            if (regPasswordInput) {
+                regPasswordInput.addEventListener('input', () => {
+                    const isValid = updatePasswordRequirements('reg-password', 'reg-');
+                    const submitBtn = document.getElementById('register-submit-btn');
+                    if (submitBtn) submitBtn.disabled = !isValid;
+                });
+            }
+
+            // Reset form submission
+            const resetForm = document.getElementById('reset-form');
+            if (resetForm) {
+                resetForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+
+                    const newPass = document.getElementById('reset-password').value;
+                    const confirmPass = document.getElementById('reset-confirm-password').value;
+                    const resetError = document.getElementById('resident-reset-error');
+
+                    const reqs = validatePasswordStrength(newPass);
+                    if (!Object.values(reqs).every(v => v)) {
+                        resetError.textContent = "Password does not meet requirements!";
+                        resetError.style.display = 'block';
+                        return;
+                    }
+
+                    if (newPass !== confirmPass) {
+                        resetError.textContent = "Passwords do not match!";
+                        resetError.style.display = 'block';
+                        return;
+                    }
+
+                    resetError.style.display = 'none';
+                    alert("Password reset successfully!");
+                    showScreen('screen-login');
+                });
+            }
+
+            // Register form submission
+            const registerForm = document.getElementById('register-form');
+            if (registerForm) {
+                registerForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+
+                    const regPass = document.getElementById('reg-password').value;
+                    const reqs = validatePasswordStrength(regPass);
+                    
+                    if (!Object.values(reqs).every(v => v)) {
+                        alert("Password does not meet requirements!");
+                        return;
+                    }
+
+                    alert("Registration successful!");
+                    showScreen('screen-login');
+                });
+            }
         });
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        // Placeholder functions
+        function openEditVehiclesModal() {
+            console.log('Edit vehicles modal');
+        }
+
+        function logoutResident() {
+            showScreen('screen-login');
+        }
     </script>
 
     <script src="js/resident.js"></script>
