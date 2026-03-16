@@ -377,39 +377,52 @@ document.addEventListener('DOMContentLoaded', () => {
         const cpNewPass = document.getElementById('cp-new-pass');
         const cpConfirmPass = document.getElementById('cp-confirm-pass');
         const cpError = document.getElementById('cp-error');
+        const changePassBtn = document.getElementById('change-password-btn');
         
-        document.getElementById('change-password-btn').addEventListener('click', (e) => {
-            e.preventDefault();
-            cpNewPass.value = '';
-            cpConfirmPass.value = '';
-            cpError.style.display = 'none';
-            changePassModal.style.display = 'flex';
-        });
+        if (changePassBtn) {
+            changePassBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (cpNewPass) cpNewPass.value = '';
+                if (cpConfirmPass) cpConfirmPass.value = '';
+                if (cpError) cpError.style.display = 'none';
+                if (changePassModal) changePassModal.style.display = 'flex';
+            });
+        }
 
-        document.getElementById('cp-cancel-btn').addEventListener('click', () => {
-            changePassModal.style.display = 'none';
-        });
+        const cpCancelBtn = document.getElementById('cp-cancel-btn');
+        if (cpCancelBtn) {
+            cpCancelBtn.addEventListener('click', () => {
+                if (changePassModal) changePassModal.style.display = 'none';
+            });
+        }
 
-        document.getElementById('cp-save-btn').addEventListener('click', () => {
-            const newPass = cpNewPass.value;
-            const confirmPass = cpConfirmPass.value;
+        const cpSaveBtn = document.getElementById('cp-save-btn');
+        if (cpSaveBtn) {
+            cpSaveBtn.addEventListener('click', () => {
+                const newPass = cpNewPass ? cpNewPass.value : '';
+                const confirmPass = cpConfirmPass ? cpConfirmPass.value : '';
 
-            if (newPass.length < 6) {
-                cpError.textContent = 'Password must be at least 6 characters';
-                cpError.style.display = 'block';
-                return;
-            }
+                if (newPass.length < 6) {
+                    if (cpError) {
+                        cpError.textContent = 'Password must be at least 6 characters';
+                        cpError.style.display = 'block';
+                    }
+                    return;
+                }
 
-            if (newPass !== confirmPass) {
-                cpError.textContent = 'Passwords do not match';
-                cpError.style.display = 'block';
-                return;
-            }
+                if (newPass !== confirmPass) {
+                    if (cpError) {
+                        cpError.textContent = 'Passwords do not match';
+                        cpError.style.display = 'block';
+                    }
+                    return;
+                }
 
-            localStorage.setItem('smartpark_admin_creds', JSON.stringify({ username: 'admin', password: newPass }));
-            changePassModal.style.display = 'none';
-            alert('Password changed successfully!');
-        });
+                localStorage.setItem('smartpark_admin_creds', JSON.stringify({ username: 'admin', password: newPass }));
+                if (changePassModal) changePassModal.style.display = 'none';
+                alert('Password changed successfully!');
+            });
+        }
 
         // Logout
         document.getElementById('logout-btn').addEventListener('click', (e) => {
@@ -433,6 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalInput = document.getElementById('total-parking-input');
         let isEditing = false;
 
+        if (editBtn && totalInput) {
         editBtn.addEventListener('click', () => {
             if (!isEditing) {
                 totalDisplay.style.display = 'none';
@@ -473,6 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
             totalInput.style.display = 'none';
             isEditing = false;
             updateParkingStats();
+        }
         }
 
         function cancelEdit() {
