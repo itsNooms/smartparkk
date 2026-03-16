@@ -285,8 +285,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadTableData();
         loadResidentsData();
         startGateMonitors();
-        adminGateContinuousScan();  // Start plate scanning on dashboard load
-        
         refreshInterval = setInterval(() => {
             loadTableData();
             loadResidentsData();
@@ -325,8 +323,8 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             stopAdminCamera();
             switchTab(tabDashboard, viewDashboard);
+            startDashboardCamera();
             startGateMonitors();
-            adminGateContinuousScan();
         });
 
         tabGate.addEventListener('click', (e) => {
@@ -1456,15 +1454,11 @@ async function adminUnblockVisitor(residentFlatId, visitorPhone, btnEl) {
 }
 
 // =============================================
-// OCR SETUP FOR ADMIN GATE
+// ADMIN EXIT CAMERA & OCR LOGIC
 // =============================================
 let adminTesseractWorker = null;
 let adminGateIsScanning = false;
 let _activeStreams = {}; // { 'gate': stream, 'monitor': stream }
-
-// Admin plate scanning with voting for stable detection
-const adminVoteBuffer = [];
-const ADMIN_VOTE_WINDOW = 4; // require matches in this many frames
 
 // Initialize Tesseract on load
 (async () => {
@@ -1476,19 +1470,11 @@ const ADMIN_VOTE_WINDOW = 4; // require matches in this many frames
                 }
             }
         });
-        
-        // Optimize Tesseract parameters for license plates
         await adminTesseractWorker.setParameters({
-            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-            tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-            preserve_interword_spaces: '0',
-            textord_heavy_nr: '1',
-            classify_bln_numeric_mode: '1',
-            edges_max_children_per_outline: '40',
-            textord_min_xheight: '10',
-            textord_max_xheight: '100'
+            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+            tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK
         });
-        console.log("Admin OCR ready for license plate recognition");
+        console.log("Admin exit Tesseract ready.");
     }
 })();
 
@@ -1497,15 +1483,11 @@ function preprocessAdminPlate(canvas) {
     const width = canvas.width;
     const height = canvas.height;
 
-    // Find the lower third where plates typically are
-    const plateAreaY = height * 0.6;
-    const plateAreaH = height * 0.35;
-    
-    // Use full width, focus on plate area
-    const cropW = width;
-    const cropH = plateAreaH;
-    const cropX = 0;
-    const cropY = plateAreaY;
+    // Zoom/crop central 60%
+    const cropW = width * 0.6;
+    const cropH = height * 0.6;
+    const cropX = (width - cropW) / 2;
+    const cropY = (height - cropH) / 2;
 
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = cropW;
@@ -1513,39 +1495,15 @@ function preprocessAdminPlate(canvas) {
     const tempCtx = tempCanvas.getContext('2d');
     tempCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-    // Apply adaptive contrast enhancement and binarization
+    // Filter
     const imgData = tempCtx.getImageData(0, 0, cropW, cropH);
     const data = imgData.data;
-    
-    // Calculate image statistics for adaptive thresholding
-    let sum = 0, min = 255, max = 0;
     for (let i = 0; i < data.length; i += 4) {
-        const gray = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
-        sum += gray;
-        if (gray < min) min = gray;
-        if (gray > max) max = gray;
-    }
-    const avg = sum / (data.length / 4);
-    
-    // Adaptive threshold based on image contrast
-    const threshold = max * 0.4 + avg * 0.3 + min * 0.3;
-    
-    // Apply binarization with slight contrast enhancement
-    for (let i = 0; i < data.length; i += 4) {
-        let r = data[i], g = data[i + 1], b = data[i + 2];
-        let gray = r * 0.299 + g * 0.587 + b * 0.114;
-        
-        // Increase contrast slightly before thresholding
-        gray = (gray - avg) * 1.2 + avg;
-        gray = Math.max(0, Math.min(255, gray));
-        
-        // Apply threshold with slight hysteresis
-        const thresholdAdjusted = threshold * (gray > 128 ? 0.85 : 1.15);
-        gray = gray < thresholdAdjusted ? 0 : 255;
-        
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        let gray = r * 0.3 + g * 0.59 + b * 0.11;
+        gray = gray < 120 ? 0 : 255;
         data[i] = data[i + 1] = data[i + 2] = gray;
     }
-    
     tempCtx.putImageData(imgData, 0, 0);
     return tempCanvas;
 }
@@ -1554,67 +1512,261 @@ function normaliseAdminOCR(text) {
     return text.replace(/[^A-Z0-9]/gi, '').toUpperCase();
 }
 
-// Improved fuzzy matching with distance calculation
 function adminFuzzyMatch(a, b) {
     if (a === b) return true;
-    
-    // Normalize both strings
-    a = a.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    b = b.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    
-    // Exact match
-    if (a === b) return true;
-    
-    // Substring match
-    if (b.includes(a) || a.includes(b)) {
-        // Ensure it's a significant substring (not just 1-2 chars)
-        const shorter = a.length < b.length ? a : b;
-        return shorter.length >= 3;
-    }
-    
-    // Length check - allow up to 2 chars difference
+    if (b.includes(a) || a.includes(b)) return true;
     const maxLen = Math.max(a.length, b.length);
     if (maxLen < 4) return false;
-    
-    const lenDiff = Math.abs(a.length - b.length);
-    if (lenDiff > 2) return false;
-    
-    // Character-by-character comparison with tolerance
-    let diffs = lenDiff;
+    let diffs = Math.abs(a.length - b.length);
     const minLen = Math.min(a.length, b.length);
     for (let i = 0; i < minLen; i++) {
         if (a[i] !== b[i]) diffs++;
     }
-    
-    // Allow 2-3 differences depending on length
-    const maxDiffs = maxLen > 6 ? 3 : 2;
-    return diffs <= maxDiffs;
+    return diffs <= 2;
 }
 
-async function startAdminGateCamera() {
-    if (_activeStreams['gate']) return;
-    const video = document.getElementById('gate-camera-feed');
-    const statusMsg = document.getElementById('gate-camera-status');
+async function startDashboardCamera() {
+    if (_activeStreams['monitor']) return;
+    const video = document.getElementById('dash-cctv-video');
     if (!video) return;
-    statusMsg.textContent = "Requesting gate camera...";
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { exact: 'environment' } }
         });
-        _activeStreams['gate'] = stream;
+        _activeStreams['monitor'] = stream;
         video.srcObject = stream;
+        document.getElementById('dash-cctv-status').textContent = 'Live';
     } catch (e) {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            _activeStreams['gate'] = stream;
+            _activeStreams['monitor'] = stream;
             video.srcObject = stream;
+            document.getElementById('dash-cctv-status').textContent = 'Live';
         } catch (err) {
-            statusMsg.textContent = "Camera access denied.";
+            document.getElementById('dash-cctv-status').textContent = 'Camera Error';
             return;
         }
     }
-    adminGateContinuousScan();
+    startDashboardScan();
+}
+
+function stopAdminCamera() {
+    Object.keys(_activeStreams).forEach(key => {
+        if (_activeStreams[key]) {
+            _activeStreams[key].getTracks().forEach(t => t.stop());
+            delete _activeStreams[key];
+        }
+    });
+    adminGateIsScanning = false;
+}
+
+// Dashboard camera continuous scan
+async function startDashboardScan() {
+    const video = document.getElementById('dash-cctv-video');
+    const canvas = document.getElementById('dash-snapshot-canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const statusMsg = document.getElementById('dash-cctv-status');
+    const overlay = document.getElementById('detected-plate-dashboard');
+
+    const entryWrap = document.getElementById('dash-match-entry-result');
+    const entryText = document.getElementById('dash-match-entry-text');
+    const entryBtn = document.getElementById('btn-dash-open-entry');
+
+    const exitWrap = document.getElementById('dash-match-exit-result');
+    const exitPlateText = document.getElementById('dash-match-exit-plate');
+    const exitChargeText = document.getElementById('dash-match-exit-charge');
+
+    if (!adminTesseractWorker) {
+        statusMsg.textContent = "OCR engine loading...";
+        setTimeout(startDashboardScan, 2000);
+        return;
+    }
+
+    adminGateIsScanning = true;
+    statusMsg.textContent = "Scanning for plates...";
+
+    while (adminGateIsScanning) {
+        await new Promise(r => setTimeout(r, 800));
+        if (!adminGateIsScanning) break;
+        if (video.readyState !== video.HAVE_ENOUGH_DATA) continue;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        try {
+            const processed = preprocessAdminPlate(canvas);
+            const tRes = await adminTesseractWorker.recognize(processed);
+            const cleanText = normaliseAdminOCR(tRes.data.text);
+
+            if (cleanText.length >= 4) {
+                overlay.textContent = cleanText;
+                overlay.style.display = 'block';
+                statusMsg.textContent = `Processing Plate: ${cleanText}...`;
+
+                // 1. Check for EXIT FIRST (if plate is already parked)
+                let matchedVisitor = null;
+                try {
+                    const visRes = await fetch('/api/visitors');
+                    const visitors = await visRes.json();
+                    matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate), cleanText));
+                } catch (e) { }
+
+                if (matchedVisitor) {
+                    statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
+
+                    const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
+                    const entryMs = new Date(matchedVisitor.entryTime).getTime();
+                    const diffHrs = (Date.now() - entryMs) / 3600000;
+                    const FINE_AMOUNT = getFineAmount();
+                    const totalCharge = (Math.max(diffHrs * parseFloat(savedRate), 0)) + (Date.now() - entryMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
+
+                    await fetch('/api/visitors/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id: matchedVisitor.id,
+                            exitTime: new Date().toISOString(),
+                            totalCharge: totalCharge
+                        })
+                    });
+
+                    statusMsg.textContent = `🚗 Vehicle exit processed: ${cleanText}`;
+                    exitPlateText.textContent = `Plate: ${cleanText}`;
+                    exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
+                    exitWrap.style.display = 'block';
+
+                    setTimeout(() => {
+                        exitWrap.style.display = 'none';
+                        overlay.style.display = 'none';
+                        statusMsg.textContent = `Resuming scan...`;
+                        startDashboardScan();
+                    }, 6000);
+                    break;
+                }
+
+                // 2. Check for ENTRY (if plate is in approved visitor requests)
+                let matchedRequest = null;
+                try {
+                    const reqRes = await fetch('/api/visitor-requests');
+                    const requests = await reqRes.json();
+                    matchedRequest = (requests || []).find(r => r.status === 'approved' && adminFuzzyMatch(normaliseAdminOCR(r.licensePlate), cleanText));
+                } catch (e) { }
+
+                if (matchedRequest) {
+                    statusMsg.textContent = `✅ Plate matched! Triggering admin notification...`;
+                    entryText.textContent = `${matchedRequest.visitorName} visiting ${matchedRequest.visitingFlatId}`;
+
+                    // Trigger gate notification immediately when plate is validated
+                    const triggerRes = await fetch('/api/gate-notifications/trigger', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            requestId: matchedRequest.id,
+                            visitorName: matchedRequest.visitorName,
+                            licensePlate: matchedRequest.licensePlate,
+                            isManual: false
+                        })
+                    });
+                    const triggerData = await triggerRes.json();
+
+                    if (triggerData.success) {
+                        statusMsg.textContent = `✅ Notification sent to admin!`;
+                        entryWrap.style.display = 'block';
+
+                        entryBtn.onclick = async () => {
+                            // Dismiss the notification to open the gate
+                            await fetch('/api/gate-notifications/dismiss', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: triggerData.notificationId })
+                            });
+                            
+                            // Also add visitor to the visitors table with entry time
+                            const entryRes = await fetch('/api/visitors', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    id: Date.now().toString(),
+                                    name: matchedRequest.visitorName,
+                                    phone: matchedRequest.visitorPhone,
+                                    licensePlate: matchedRequest.licensePlate,
+                                    visitingFlat: matchedRequest.visitingFlatId,
+                                    entryTime: new Date().toISOString()
+                                })
+                            });
+                            
+                            entryWrap.style.display = 'none';
+                            overlay.style.display = 'none';
+                            statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Entry recorded!`;
+                            adminGateIsScanning = false;
+                            setTimeout(startDashboardScan, 3000);
+                        };
+                    } else {
+                        statusMsg.textContent = `⚠️ Failed to notify admin: ${triggerData.message || 'Unknown error'}`;
+                        setTimeout(startDashboardScan, 3000);
+                    }
+                    break;
+                }
+
+                // 3. If not found in either, show message
+                statusMsg.textContent = `❌ Plate not found in system`;
+                setTimeout(startDashboardScan, 3000);
+                break;
+            } else {
+                overlay.style.display = 'none';
+                statusMsg.textContent = "Scanning for plates...";
+            }
+                    break;
+                }
+
+                // 2. Check for EXIT
+                let matchedVisitor = null;
+                try {
+                    const visRes = await fetch('/api/visitors');
+                    const visitors = await visRes.json();
+                    matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate), cleanText));
+                } catch (e) { }
+
+                if (matchedVisitor) {
+                    statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
+
+                    const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
+                    const entryMs = new Date(matchedVisitor.entryTime).getTime();
+                    const diffHrs = (Date.now() - entryMs) / 3600000;
+                    const FINE_AMOUNT = getFineAmount();
+                    const totalCharge = (Math.max(diffHrs * parseFloat(savedRate), 0)) + (Date.now() - entryMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
+
+                    await fetch('/api/visitors/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id: matchedVisitor.id,
+                            exitTime: new Date().toISOString(),
+                            totalCharge: totalCharge
+                        })
+                    });
+
+                    statusMsg.textContent = `🚗 Vehicle exit processed: ${cleanText}`;
+                    exitPlateText.textContent = `Plate: ${cleanText}`;
+                    exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
+                    exitWrap.style.display = 'block';
+
+                    setTimeout(() => {
+                        exitWrap.style.display = 'none';
+                        overlay.style.display = 'none';
+                        statusMsg.textContent = `Resuming scan...`;
+                        startDashboardScan();
+                    }, 6000);
+                    break;
+                }
+            } else {
+                overlay.style.display = 'none';
+                statusMsg.textContent = "Scanning for plates...";
+            }
+        } catch (err) { console.warn(err); }
+    }
 }
 
 function stopAdminCamera() {
@@ -1660,34 +1812,31 @@ async function startGateMonitors() {
 // (Camera remains running in the background when changing tabs)
 
 async function adminGateContinuousScan() {
-    const video = document.getElementById('dash-cctv-video');
-    const canvas = document.getElementById('dash-snapshot-canvas');
+    const video = document.getElementById('gate-camera-feed');
+    const canvas = document.getElementById('gate-snapshot-canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const statusMsg = document.getElementById('dash-cctv-status');
-    const overlay = document.getElementById('detected-plate-dashboard');
+    const statusMsg = document.getElementById('gate-camera-status');
+    const overlay = document.getElementById('detected-plate-admin-gate');
 
-    const entryWrap = document.getElementById('dash-match-entry-result');
-    const entryText = document.getElementById('dash-match-entry-text');
-    const entryBtn = document.getElementById('btn-dash-open-entry');
+    const entryWrap = document.getElementById('gate-match-entry-result');
+    const entryText = document.getElementById('gate-match-entry-text');
+    const entryBtn = document.getElementById('btn-gate-open-entry');
 
-    const exitWrap = document.getElementById('dash-match-exit-result');
-    const exitPlateText = document.getElementById('dash-match-exit-plate');
-    const exitChargeText = document.getElementById('dash-match-exit-charge');
+    const exitWrap = document.getElementById('gate-match-exit-result');
+    const exitPlateText = document.getElementById('gate-match-exit-plate');
+    const exitChargeText = document.getElementById('gate-match-exit-charge');
 
     if (!adminTesseractWorker) {
-        statusMsg.textContent = "OCR engine loading...";
+        statusMsg.textContent = "OCR engine missing or loading...";
         setTimeout(adminGateContinuousScan, 2000);
         return;
     }
 
-    // Clear vote buffer on scan start
-    adminVoteBuffer.length = 0;
-    
     adminGateIsScanning = true;
-    statusMsg.textContent = "Scanning for plates...";
+    statusMsg.textContent = "Auto-monitoring entrance & exit...";
 
     while (adminGateIsScanning) {
-        await new Promise(r => setTimeout(r, 500)); // Faster scanning
+        await new Promise(r => setTimeout(r, 800));
         if (!adminGateIsScanning) break;
         if (video.readyState !== video.HAVE_ENOUGH_DATA) continue;
 
@@ -1701,148 +1850,123 @@ async function adminGateContinuousScan() {
             const cleanText = normaliseAdminOCR(tRes.data.text);
 
             if (cleanText.length >= 4) {
-                // Add to vote buffer
-                adminVoteBuffer.push(cleanText);
-                if (adminVoteBuffer.length > ADMIN_VOTE_WINDOW) {
-                    adminVoteBuffer.shift();
-                }
+                overlay.textContent = cleanText;
+                overlay.style.display = 'block';
+                statusMsg.textContent = `Scanning plate: ${cleanText}...`;
 
-                // Find most frequent plate in buffer
-                let bestPlate = '';
-                let maxCount = 0;
-                const counts = {};
-                for (const plate of adminVoteBuffer) {
-                    counts[plate] = (counts[plate] || 0) + 1;
-                    if (counts[plate] > maxCount) {
-                        maxCount = counts[plate];
-                        bestPlate = plate;
-                    }
-                }
+                // 1. Check for ENTRY
+                let matchedRequest = null;
+                try {
+                    const reqRes = await fetch('/api/visitor-requests');
+                    const requests = await reqRes.json();
+                    matchedRequest = (requests || []).find(r => r.status === 'approved' && adminFuzzyMatch(normaliseAdminOCR(r.licensePlate), cleanText));
+                } catch (e) { }
 
-                // Only process if we have enough consistent detections
-                if (maxCount >= 2 && bestPlate.length >= 4) {
-                    overlay.textContent = bestPlate;
-                    overlay.style.display = 'block';
-                    statusMsg.textContent = `Scanning: ${bestPlate}...`;
+                if (matchedRequest) {
+                    statusMsg.textContent = `✅ Plate matched! Triggering admin notification...`;
+                    entryText.textContent = `${matchedRequest.visitorName} visiting ${matchedRequest.visitingFlatId}`;
 
-                    // 1. Check for EXIT FIRST (if plate is already parked)
-                    let matchedVisitor = null;
-                    try {
-                        const visRes = await fetch('/api/visitors');
-                        const visitors = await visRes.json();
-                        matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate), bestPlate));
-                    } catch (e) { }
+                    // Trigger gate notification immediately when plate is validated
+                    const triggerRes = await fetch('/api/gate-notifications/trigger', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            requestId: matchedRequest.id,
+                            visitorName: matchedRequest.visitorName,
+                            licensePlate: matchedRequest.licensePlate,
+                            isManual: false
+                        })
+                    });
+                    const triggerData = await triggerRes.json();
 
-                    if (matchedVisitor) {
-                        statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
+                    if (triggerData.success) {
+                        statusMsg.textContent = `✅ Notification sent to admin!`;
+                        entryWrap.style.display = 'block';
 
-                        const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
-                        const entryMs = new Date(matchedVisitor.entryTime).getTime();
-                        const diffHrs = (Date.now() - entryMs) / 3600000;
-                        const FINE_AMOUNT = getFineAmount();
-                        const totalCharge = (Math.max(diffHrs * parseFloat(savedRate), 0)) + (Date.now() - entryMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
-
-                        await fetch('/api/visitors/update', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                id: matchedVisitor.id,
-                                exitTime: new Date().toISOString(),
-                                totalCharge: totalCharge
-                            })
-                        });
-
-                        statusMsg.textContent = `🚗 Vehicle exit processed: ${bestPlate}`;
-                        exitPlateText.textContent = `Plate: ${bestPlate}`;
-                        exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
-                        exitWrap.style.display = 'block';
-
-                        setTimeout(() => {
-                            exitWrap.style.display = 'none';
+                        entryBtn.onclick = async () => {
+                            // Dismiss the notification to open the gate
+                            await fetch('/api/gate-notifications/dismiss', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: triggerData.notificationId })
+                            });
+                            
+                            // Also add visitor to the visitors table with entry time
+                            const entryRes = await fetch('/api/visitors', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    id: Date.now().toString(),
+                                    name: matchedRequest.visitorName,
+                                    phone: matchedRequest.visitorPhone,
+                                    licensePlate: matchedRequest.licensePlate,
+                                    visitingFlat: matchedRequest.visitingFlatId,
+                                    entryTime: new Date().toISOString()
+                                })
+                            });
+                            
+                            entryWrap.style.display = 'none';
                             overlay.style.display = 'none';
-                            adminVoteBuffer.length = 0;
-                            statusMsg.textContent = `Resuming scan...`;
-                            adminGateContinuousScan();
-                        }, 6000);
-                        break;
-                    }
-
-                    // 2. Check for ENTRY (if plate is in approved visitor requests)
-                    let matchedRequest = null;
-                    try {
-                        const reqRes = await fetch('/api/visitor-requests');
-                        const requests = await reqRes.json();
-                        matchedRequest = (requests || []).find(r => r.status === 'approved' && adminFuzzyMatch(normaliseAdminOCR(r.licensePlate), bestPlate));
-                    } catch (e) { }
-
-                    if (matchedRequest) {
-                        statusMsg.textContent = `✅ Plate matched! Triggering admin notification...`;
-                        entryText.textContent = `${matchedRequest.visitorName} visiting ${matchedRequest.visitingFlat}`;
-
-                        // Trigger gate notification immediately when plate is validated
-                        const triggerRes = await fetch('/api/gate-notifications/trigger', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                requestId: matchedRequest.id,
-                                visitorName: matchedRequest.visitorName,
-                                licensePlate: matchedRequest.licensePlate,
-                                isManual: false
-                            })
-                        });
-                        const triggerData = await triggerRes.json();
-
-                        if (triggerData.success) {
-                            statusMsg.textContent = `✅ Notification sent to admin!`;
-                            entryWrap.style.display = 'block';
-
-                            entryBtn.onclick = async () => {
-                                // Dismiss the notification to open the gate
-                                await fetch('/api/gate-notifications/dismiss', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ id: triggerData.notificationId })
-                                });
-                                
-                                // Also add visitor to the visitors table with entry time
-                                const entryRes = await fetch('/api/visitors', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        id: Date.now().toString(),
-                                        name: matchedRequest.visitorName,
-                                        phone: matchedRequest.visitorPhone,
-                                        licensePlate: matchedRequest.licensePlate,
-                                    visitingFlat: matchedRequest.visitingFlat,
-                                        entryTime: new Date().toISOString()
-                                    })
-                                });
-                                
-                                entryWrap.style.display = 'none';
-                                overlay.style.display = 'none';
-                                adminVoteBuffer.length = 0;
-                                statusMsg.textContent = `🔓 Gate opened for ${bestPlate}. Entry recorded!`;
-                                adminGateIsScanning = false;
-                                setTimeout(adminGateContinuousScan, 3000);
-                            };
-                        } else {
-                            statusMsg.textContent = `⚠️ Failed to notify admin: ${triggerData.message || 'Unknown error'}`;
+                            statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Entry recorded!`;
+                            adminGateIsScanning = false;
                             setTimeout(adminGateContinuousScan, 3000);
-                        }
-                        break;
+                        };
+                    } else {
+                        statusMsg.textContent = `⚠️ Failed to notify admin: ${triggerData.message || 'Unknown error'}`;
+                        setTimeout(adminGateContinuousScan, 3000);
                     }
-                } else {
-                    // Show raw detection while voting
-                    overlay.textContent = cleanText;
-                    overlay.style.display = 'block';
+                    break;
+                }
+
+                // 2. Check for EXIT
+                let matchedVisitor = null;
+                try {
+                    const visRes = await fetch('/api/visitors');
+                    const visitors = await visRes.json();
+                    matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate), cleanText));
+                } catch (e) { }
+
+                if (matchedVisitor) {
+                    adminGateIsScanning = false;
+                    statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
+
+                    const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
+                    const entryMs = new Date(matchedVisitor.entryTime).getTime();
+                    const diffHrs = (Date.now() - entryMs) / 3600000;
+                    const FINE_AMOUNT = getFineAmount();
+                    const totalCharge = (Math.max(diffHrs * parseFloat(savedRate), 0)) + (Date.now() - entryMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
+
+                    await fetch('/api/visitors/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id: matchedVisitor.id,
+                            exitTime: new Date().toISOString(),
+                            totalCharge: totalCharge
+                        })
+                    });
+
+                    statusMsg.textContent = `🚗 Vehicle exit processed: ${cleanText}`;
+                    exitPlateText.textContent = `Plate: ${cleanText}`;
+                    exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
+                    exitWrap.style.display = 'block';
+
+                    setTimeout(() => {
+                        exitWrap.style.display = 'none';
+                        overlay.style.display = 'none';
+                        statusMsg.textContent = `Resuming...`;
+                        adminGateContinuousScan();
+                    }, 6000);
+                    break;
                 }
             } else {
                 overlay.style.display = 'none';
-                adminVoteBuffer.length = 0;
-                statusMsg.textContent = "Scanning for plates...";
+                statusMsg.textContent = "Auto-monitoring entrance & exit...";
             }
-        } catch (err) { 
-            console.warn("OCR error:", err);
-        }
+        } catch (err) { console.warn(err); }
     }
 }
+
+// ============================================
+// SETTINGS EDITING
+// ============================================
