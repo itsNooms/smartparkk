@@ -75,6 +75,52 @@
             margin-bottom: 8px;
         }
 
+        /* ===== PASSWORD INPUT WITH TOGGLE ===== */
+        .password-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group input[type="password"],
+        .input-group input[type="text"].password-visible {
+            width: 100%;
+            padding: 14px 16px;
+            padding-right: 45px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .input-group input[type="password"]:focus,
+        .input-group input[type="text"].password-visible:focus {
+            border-color: var(--primary);
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 14px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 6px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            font-size: 18px;
+        }
+
+        .password-toggle-btn:hover {
+            color: var(--primary);
+        }
+
         .input-group input {
             width: 100%;
             padding: 14px 16px;
@@ -200,7 +246,12 @@
                 </div>
                 <div class="input-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" required placeholder="Enter password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="password" required placeholder="Enter password">
+                        <button type="button" class="password-toggle-btn" id="password-toggle" title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
                 </div>
                 <!-- Forgot Password Link -->
                 <div style="text-align: right; margin-bottom: 15px;">
@@ -270,11 +321,21 @@
             <form id="reset-form">
                 <div class="input-group">
                     <label for="new-password">New Password</label>
-                    <input type="password" id="new-password" required placeholder="Enter new password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="new-password" required placeholder="Enter new password">
+                        <button type="button" class="password-toggle-btn" id="new-password-toggle" title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
                 </div>
                 <div class="input-group">
                     <label for="confirm-password">Confirm Password</label>
-                    <input type="password" id="confirm-password" required placeholder="Confirm new password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="confirm-password" required placeholder="Confirm new password">
+                        <button type="button" class="password-toggle-btn" id="confirm-password-toggle" title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
                 </div>
                 <div class="status-msg" id="reset-error"
                     style="color: var(--danger); display: none; margin-bottom: 15px; min-height: 0;">Passwords do
@@ -745,6 +806,36 @@
     </div>
 
     <script src="https://unpkg.com/tesseract.js@v5.0.3/dist/tesseract.min.js"></script>
+    <script>
+        // ===== PASSWORD VISIBILITY TOGGLE FEATURE =====
+        function initPasswordToggle(inputId, toggleId) {
+            const inputEl = document.getElementById(inputId);
+            const toggleBtn = document.getElementById(toggleId);
+
+            if (!inputEl || !toggleBtn) return;
+
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+
+                if (inputEl.type === 'password') {
+                    inputEl.type = 'text';
+                    toggleBtn.textContent = '🙈'; // Eye closed icon
+                    toggleBtn.title = 'Hide password';
+                } else {
+                    inputEl.type = 'password';
+                    toggleBtn.textContent = '👁️'; // Eye open icon
+                    toggleBtn.title = 'Show password';
+                }
+            });
+        }
+
+        // Initialize all password toggles on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initPasswordToggle('password', 'password-toggle');
+            initPasswordToggle('new-password', 'new-password-toggle');
+            initPasswordToggle('confirm-password', 'confirm-password-toggle');
+        });
+    </script>
     <script src="js/admin.js"></script>
 
     <!-- Gate Notification Banner (injected by JS, but styles defined here) -->
