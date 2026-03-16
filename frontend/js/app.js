@@ -968,8 +968,8 @@ function pollAdminGateAction(notifId) {
 
 function startParking() {
     visitorData.entryTime = new Date();
-    const spotSuffix = visitorData.selectedSpot ? `-${visitorData.selectedSpot.label}` : '';
-    visitorData.id = Date.now().toString() + spotSuffix;
+    // Use the requestId as the ID to avoid duplicates with the admin side
+    visitorData.id = pendingRequestId || (Date.now().toString() + (visitorData.selectedSpot ? `-${visitorData.selectedSpot.label}` : ''));
     visitorData.ratePerHour = getRate();
 
     // Save to local storage array for the admin dashboard
@@ -987,12 +987,45 @@ function startParking() {
     // Start Timer
     updateTimer();
     parkingTimer = setInterval(updateTimer, 1000);
+
+    // Start polling for exit status (admin processing exit)
+    startExitPolling();
+}
+
+let exitPollInterval = null;
+function startExitPolling() {
+    if (exitPollInterval) clearInterval(exitPollInterval);
+
+    exitPollInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/visitors');
+            const all = await res.json();
+
+            // Find ourselves by ID in the list to see if we've been marked as exited
+            const me = all.find(v => v.id === visitorData.id && v.exitTime);
+
+            if (me) {
+                console.log('[EXIT] Admin processed exit for:', me.licensePlate);
+                clearInterval(exitPollInterval);
+                exitPollInterval = null;
+
+                // Update local visitorData with server values
+                visitorData.exitTime = me.exitTime;
+                visitorData.totalCharge = me.totalCharge;
+                visitorData.id = me.id;
+
+                handleAutoExit(true); // true means came from server
+            }
+        } catch (err) {
+            console.warn('Exit poll error:', err);
+        }
+    }, 5000); // Check every 5 seconds
 }
 
 function updateTimer() {
     const now = Date.now();
     const entryMs = new Date(visitorData.entryTime).getTime();
-    const diffMs = now - entryMs;
+    const diffMs = Math.max(now - entryMs, 0);
 
     const diffHrs = Math.floor(diffMs / 3600000);
     const diffMins = Math.floor((diffMs % 3600000) / 60000);
@@ -1013,11 +1046,15 @@ function updateTimer() {
 }
 
 // 5. Automatic Exit on plate detection
-function handleAutoExit() {
-    clearInterval(parkingTimer);
+function handleAutoExit(fromServer = false) {
+    if (parkingTimer) clearInterval(parkingTimer);
+    if (exitPollInterval) clearInterval(exitPollInterval);
     stopCamera();
 
-    visitorData.exitTime = new Date();
+    if (!fromServer) {
+        visitorData.exitTime = new Date();
+    }
+
     updateFinalReceipt();
     showScreen('screen-receipt');
 }
@@ -1026,7 +1063,7 @@ function updateFinalReceipt() {
     // Ensure dates are proper Date objects
     const entry = new Date(visitorData.entryTime);
     const exit = new Date(visitorData.exitTime);
-    const diffMs = exit.getTime() - entry.getTime();
+    const diffMs = Math.max(exit.getTime() - entry.getTime(), 0);
 
     console.log('Entry:', entry.toISOString(), 'Exit:', exit.toISOString(), 'Diff ms:', diffMs);
 
@@ -1063,6 +1100,8 @@ function updateFinalReceipt() {
 }
 
 function resetApp() {
+    if (parkingTimer) clearInterval(parkingTimer);
+    if (exitPollInterval) clearInterval(exitPollInterval);
     window.location.reload();
 }
 
