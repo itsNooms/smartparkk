@@ -616,13 +616,16 @@ app.get('/api/visitors', async (req, res) => {
 app.post('/api/visitors', async (req, res) => {
     const b = req.body;
 
-    // Check if this plate is already in the system (no exit_time)
-    const { data: existingVisitor } = await supabase
+    // Check if another vehicle with this plate is already parked
+    let dupQuery = supabase
         .from('visitors')
         .select('id')
         .eq('license_plate', b.licensePlate)
-        .is('exit_time', null)
-        .limit(1);
+        .is('exit_time', null);
+
+    if (b.id) dupQuery = dupQuery.neq('id', b.id);
+
+    const { data: existingVisitor } = await dupQuery.limit(1);
 
     if (existingVisitor && existingVisitor.length > 0) {
         return res.status(400).json({
@@ -631,7 +634,7 @@ app.post('/api/visitors', async (req, res) => {
         });
     }
 
-    const { data, error } = await supabase.from('visitors').insert([{
+    const { data, error } = await supabase.from('visitors').upsert([{
         id: b.id || Date.now().toString(),
         name: b.name,
         phone: b.phone,
@@ -643,7 +646,7 @@ app.post('/api/visitors', async (req, res) => {
         total_charge: b.totalCharge || 0,
         estimated_hours: b.estimatedHours || 4,
         extension_notified_at: null
-    }]).select();
+    }], { onConflict: 'id' }).select();
 
     if (error) return res.status(500).json({ success: false, message: error.message });
 
