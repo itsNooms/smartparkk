@@ -274,22 +274,28 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(settings => {
                 settings.forEach(s => {
                     if (s.key === 'smartpark_total_parking') {
-                        document.getElementById('total-parking-display').textContent = s.value;
-                        document.getElementById('total-parking-input').value = s.value;
+                        const el = document.getElementById('total-parking-display');
+                        const inputEl = document.getElementById('total-parking-input');
+                        if (el) el.textContent = s.value;
+                        if (inputEl) inputEl.value = s.value;
                         localStorage.setItem('smartpark_total_parking', s.value);
                     }
                     if (s.key === 'smartpark_rate_per_hour') {
-                        document.getElementById('rate-parking-display').textContent = s.value;
-                        document.getElementById('rate-parking-input').value = s.value;
+                        const el = document.getElementById('rate-parking-display');
+                        const inputEl = document.getElementById('rate-parking-input');
+                        if (el) el.textContent = s.value;
+                        if (inputEl) inputEl.value = s.value;
                         localStorage.setItem('smartpark_rate_per_hour', s.value);
                     }
                     if (s.key === 'smartpark_fine_amount') {
-                        document.getElementById('fine-amount-display').textContent = s.value;
-                        document.getElementById('fine-amount-input').value = s.value;
+                        const el = document.getElementById('fine-amount-display');
+                        const inputEl = document.getElementById('fine-amount-input');
+                        if (el) el.textContent = s.value;
+                        if (inputEl) inputEl.value = s.value;
                         localStorage.setItem('smartpark_fine_amount', s.value);
                     }
                 });
-                updateParkingStats();
+                if (typeof updateParkingStats === 'function') updateParkingStats();
             })
             .catch(err => console.error('[SETTINGS] Load error:', err));
 
@@ -320,14 +326,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const viewBlocked = document.getElementById('blocked-view');
 
         const allTabs = [tabDashboard, tabGate, tabResidents, tabHistory, tabParkingLot, tabBlocked];
-        const allViews = [viewDashboard, viewGate, viewResidents, viewHistory, viewParkingLot, viewBlocked];
+        const allViews = [viewDashboard, viewGate, viewResidents, viewHistory, viewParkingLot, viewBlocked].filter(v => v);
 
         function switchTab(activeTab, activeView) {
-            allTabs.forEach(t => t.classList.remove('active'));
-            allViews.forEach(v => v.style.display = 'none');
+            allTabs.forEach(t => t && t.classList.remove('active'));
+            allViews.forEach(v => v && (v.style.display = 'none'));
 
-            activeTab.classList.add('active');
-            activeView.style.display = 'block';
+            activeTab && activeTab.classList.add('active');
+            activeView && (activeView.style.display = 'block');
         }
 
         tabDashboard.addEventListener('click', (e) => {
@@ -633,10 +639,10 @@ async function loadTableData() {
         const activeCountEl = document.getElementById('active-count');
 
         if (!entries || entries.length === 0) {
-            logsBody.innerHTML = '';
-            emptyState.classList.remove('hidden');
-            activeCountEl.textContent = '0';
-            updateParkingStats(0);
+            if (logsBody) logsBody.innerHTML = '';
+            if (emptyState) emptyState.classList.remove('hidden');
+            if (activeCountEl) activeCountEl.textContent = '0';
+            if (typeof updateParkingStats === 'function') updateParkingStats(0);
             const revenueEl = document.getElementById('revenue-month');
             if (revenueEl) revenueEl.textContent = '₹0.00';
             return;
@@ -688,30 +694,30 @@ async function loadTableData() {
 
         // Render Dashboard Table
         if (dashboardEntries.length === 0) {
-            logsBody.innerHTML = '';
-            emptyState.classList.remove('hidden');
+            if (logsBody) logsBody.innerHTML = '';
+            if (emptyState) emptyState.classList.remove('hidden');
         } else {
-            emptyState.classList.add('hidden');
+            if (emptyState) emptyState.classList.add('hidden');
         }
 
         let activeCount = 0;
-        logsBody.innerHTML = '';
+        if (logsBody) logsBody.innerHTML = '';
 
         dashboardEntries.forEach(entry => {
             const isCompleted = !!entry.exitTime;
             if (!isCompleted) activeCount++;
-            logsBody.appendChild(createRowHTML(entry, isCompleted));
+            if (logsBody) logsBody.appendChild(createRowHTML(entry, isCompleted));
         });
 
         // Render History Table
         if (historyEntries.length === 0) {
-            historyBody.innerHTML = '';
-            historyEmptyState.classList.remove('hidden');
+            if (historyBody) historyBody.innerHTML = '';
+            if (historyEmptyState) historyEmptyState.classList.remove('hidden');
         } else {
-            historyEmptyState.classList.add('hidden');
+            if (historyEmptyState) historyEmptyState.classList.add('hidden');
         }
 
-        historyBody.innerHTML = '';
+        if (historyBody) historyBody.innerHTML = '';
         historyEntries.forEach(entry => {
             const isCompleted = !!entry.exitTime;
             historyBody.appendChild(createRowHTML(entry, isCompleted));
