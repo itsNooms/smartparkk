@@ -17,6 +17,44 @@
 
     <link rel="stylesheet" href="css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Password visibility toggle styles */
+        .password-input-group {
+            position: relative;
+            width: 100%;
+        }
+
+        .password-input-group input {
+            width: 100%;
+            padding-right: 40px;
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .password-toggle-btn:hover {
+            color: var(--primary);
+        }
+
+        .password-toggle-btn:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+    </style>
 </head>
 
 <body>
@@ -38,7 +76,12 @@
                     </div>
                     <div class="input-group">
                         <label for="login-password">Password</label>
-                        <input type="password" id="login-password" required placeholder="••••••••">
+                        <div class="password-input-group">
+                            <input type="password" id="login-password" required placeholder="••••••••">
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('login-password')">
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <button type="submit" class="btn btn-primary">Login</button>
@@ -107,11 +150,21 @@
                 <form id="reset-form">
                     <div class="input-group">
                         <label for="reset-password">New Password</label>
-                        <input type="password" id="reset-password" required placeholder="Create a new password">
+                        <div class="password-input-group">
+                            <input type="password" id="reset-password" required placeholder="Create a new password">
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('reset-password')">
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <div class="input-group">
                         <label for="reset-confirm-password">Confirm Password</label>
-                        <input type="password" id="reset-confirm-password" required placeholder="Confirm new password">
+                        <div class="password-input-group">
+                            <input type="password" id="reset-confirm-password" required placeholder="Confirm new password">
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('reset-confirm-password')">
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <div class="status-msg" id="resident-reset-error"
                         style="color: var(--danger); display: none; margin-bottom: 15px; min-height: 0;">Passwords do
@@ -156,7 +209,12 @@
                     </div>
                     <div class="input-group">
                         <label for="reg-password">Password</label>
-                        <input type="password" id="reg-password" required placeholder="Create a password">
+                        <div class="password-input-group">
+                            <input type="password" id="reg-password" required placeholder="Create a password">
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('reg-password')">
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary">Register</button>
                     <button type="button" class="btn btn-text" onclick="showScreen('screen-login')">Already registered?
@@ -340,6 +398,22 @@
             border-color: rgba(239, 68, 68, 0.55);
         }
     </style>
+
+    <script>
+        // Password visibility toggle function
+        function togglePasswordVisibility(fieldId) {
+            const passwordField = document.getElementById(fieldId);
+            const toggleBtn = event.currentTarget;
+
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                toggleBtn.textContent = '🙈';
+            } else {
+                passwordField.type = 'password';
+                toggleBtn.textContent = '👁️';
+            }
+        }
+    </script>
 
     <script src="js/resident.js"></script>
 </body>

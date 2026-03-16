@@ -71,17 +71,34 @@ webpush.setVapidDetails(
     process.env.VAPID_PRIVATE_KEY
 );
 
-const SUBSCRIPTIONS_FILE = path.join(__dirname, 'subscriptions.json');
-function getSubscriptions() {
+async function getSubscriptions(adminId) {
     try {
-        if (!fs.existsSync(SUBSCRIPTIONS_FILE)) return {};
-        return JSON.parse(fs.readFileSync(SUBSCRIPTIONS_FILE));
+        const { data, error } = await supabase
+            .from('push_subscriptions')
+            .select('*')
+            .eq('admin_id', adminId);
+
+        if (error) return {};
+
+        const subs = {};
+        (data || []).forEach(row => {
+            subs[row.flat_id.toUpperCase()] = row.subscription_data;
+        });
+        return subs;
     } catch (e) { return {}; }
 }
-function saveSubscription(flatId, sub) {
-    const subs = getSubscriptions();
-    subs[flatId] = sub;
-    fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(subs, null, 2));
+
+async function saveSubscription(adminId, flatId, sub) {
+    try {
+        await supabase
+            .from('push_subscriptions')
+            .upsert({
+                admin_id: adminId,
+                flat_id: flatId.toUpperCase(),
+                subscription_data: sub,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'admin_id,flat_id' });
+    } catch (e) { console.error('[SUBS] Save error:', e); }
 }
 
 // Bypassing Jio DNS Blocking for Supabase (ONLY USE IF NEEDED LOCALLY)
@@ -139,6 +156,13 @@ app.use('/api', (req, res, next) => {
     }
     next();
 });
+
+// Middleware to extract adminId for relevant API calls
+const withAdmin = (req, res, next) => {
+    const adminId = req.headers['x-admin-id'] || req.query.adminId || req.body.adminId || 1;
+    req.adminId = adminId;
+    next();
+};
 
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
 app.use(express.static(FRONTEND_DIR));
@@ -230,10 +254,11 @@ app.get('/api/qr', async (req, res) => {
 // SETTINGS API (SUPABASE)
 // ============================================
 
-// Get all settings
+// Get all settings for a specific admin
 app.get('/api/settings', async (req, res) => {
+    const adminId = req.query.adminId || 1; // Fallback to 1 for backward compatibility
     try {
-        const { data, error } = await supabase.from('settings').select('*');
+        const { data, error } = await supabase.from('settings').select('*').eq('admin_id', adminId);
         if (error) {
             // Table might not exist yet, return empty array (defaults will be used)
             console.warn('[SETTINGS] Fetch error (likely table missing):', error.message);
@@ -245,16 +270,75 @@ app.get('/api/settings', async (req, res) => {
     }
 });
 
-// Update or create a setting
+// ============================================
+// ADMIN AUTH API (SUPABASE)
+// ============================================
+
+// Register an admin
+app.post('/api/admin/register', async (req, res) => {
+    const { username, password, phone } = req.body;
+    if (!username || !password || !phone) {
+        return res.status(400).json({ success: false, message: 'Username, password, and phone are required' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('admins')
+            .insert([{ username, password, phone }])
+            .select();
+
+        if (error) {
+            if (error.code === '23505') {
+                return res.status(400).json({ success: false, message: 'Username already exists' });
+            }
+            return res.status(500).json({ success: false, message: error.message });
+        }
+        res.json({ success: true, admin: { id: data[0].id, username: data[0].username } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Admin login
+app.post('/api/admin/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    // Backward compatibility for hardcoded demo account
+    if (username === 'admin' && password === 'Admin@123') {
+        // Try to find the 'admin' user in DB to get its ID
+        const { data: adminData } = await supabase.from('admins').select('id').eq('username', 'admin').single();
+        return res.json({ success: true, admin: { id: adminData ? adminData.id : 1, username: 'admin' } });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('admins')
+            .select('*')
+            .eq('username', username)
+            .eq('password', password) // In a real app, use hashed passwords!
+            .single();
+
+        if (error || !data) {
+            return res.status(401).json({ success: false, message: 'Invalid username or password' });
+        }
+
+        res.json({ success: true, admin: { id: data.id, username: data.username, email: data.email } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Update or create a setting for a specific admin
 app.post('/api/settings', async (req, res) => {
-    const { key, value } = req.body;
+    const { key, value, adminId } = req.body;
     if (!key) return res.status(400).json({ success: false, message: 'key is required' });
+    if (!adminId) return res.status(400).json({ success: false, message: 'adminId is required' });
 
     try {
         // Upsert setting
         const { data, error } = await supabase
             .from('settings')
-            .upsert([{ key, value, updated_at: new Date().toISOString() }], { onConflict: 'key' })
+            .upsert([{ admin_id: adminId, key, value, updated_at: new Date().toISOString() }], { onConflict: 'admin_id,key' })
             .select();
 
         if (error) {
@@ -394,7 +478,7 @@ function generateOTP() {
 }
 
 // POST /api/send-otp
-app.post('/api/send-otp', async (req, res) => {
+app.post('/api/send-otp', withAdmin, async (req, res) => {
     const { phone } = req.body;
 
     if (!phone || phone.length < 10) {
@@ -403,7 +487,8 @@ app.post('/api/send-otp', async (req, res) => {
 
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
     const otp = generateOTP();
-    otpStore[cleanPhone] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 };
+    const otpKey = `${cleanPhone}_${req.adminId}`;
+    otpStore[otpKey] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 };
 
     if (waReady) {
         try {
@@ -442,7 +527,7 @@ app.post('/api/send-otp', async (req, res) => {
 });
 
 // POST /api/verify-otp
-app.post('/api/verify-otp', (req, res) => {
+app.post('/api/verify-otp', withAdmin, (req, res) => {
     const { phone, otp } = req.body;
 
     if (!phone || !otp) {
@@ -450,19 +535,20 @@ app.post('/api/verify-otp', (req, res) => {
     }
 
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    const stored = otpStore[cleanPhone];
+    const otpKey = `${cleanPhone}_${req.adminId}`;
+    const stored = otpStore[otpKey];
 
     if (!stored) {
         return res.json({ success: false, message: 'No OTP found for this number. Request a new one.' });
     }
 
     if (Date.now() > stored.expiresAt) {
-        delete otpStore[cleanPhone];
+        delete otpStore[otpKey];
         return res.json({ success: false, message: 'OTP expired. Request a new one.' });
     }
 
     if (stored.otp === otp) {
-        delete otpStore[cleanPhone];
+        delete otpStore[otpKey];
         return res.json({ success: true, message: 'OTP verified successfully' });
     }
 
@@ -474,8 +560,8 @@ app.post('/api/verify-otp', (req, res) => {
 // ============================================
 
 // Get all residents
-app.get('/api/residents', async (req, res) => {
-    const { data, error } = await supabase.from('residents').select('*');
+app.get('/api/residents', withAdmin, async (req, res) => {
+    const { data, error } = await supabase.from('residents').select('*').eq('admin_id', req.adminId);
     if (error) return res.status(500).json({ success: false, message: error.message });
 
     // Map DB column names to frontend-expected camelCase
@@ -494,10 +580,11 @@ app.get('/api/residents', async (req, res) => {
 });
 
 // Register a resident
-app.post('/api/residents', async (req, res) => {
+app.post('/api/residents', withAdmin, async (req, res) => {
     const b = req.body;
     const { data, error } = await supabase.from('residents').insert([{
         id: b.id,
+        admin_id: req.adminId,
         name: b.name,
         flat_input: b.flatInput,
         base_flat_id: b.baseFlatId,
@@ -513,7 +600,7 @@ app.post('/api/residents', async (req, res) => {
 });
 
 // Update a resident (password, availability, or car plates)
-app.post('/api/residents/update', async (req, res) => {
+app.post('/api/residents/update', withAdmin, async (req, res) => {
     const { flatInput, password, isAvailable, carPlate } = req.body;
 
     const updates = {};
@@ -524,6 +611,7 @@ app.post('/api/residents/update', async (req, res) => {
     const { data, error } = await supabase
         .from('residents')
         .update(updates)
+        .eq('admin_id', req.adminId)
         .eq('flat_input', flatInput)
         .select();
 
@@ -533,8 +621,8 @@ app.post('/api/residents/update', async (req, res) => {
     res.json({ success: true, resident: data[0] });
 });
 
-app.get('/api/visitors', async (req, res) => {
-    const { data, error } = await supabase.from('visitors').select('*');
+app.get('/api/visitors', withAdmin, async (req, res) => {
+    const { data, error } = await supabase.from('visitors').select('*').eq('admin_id', req.adminId);
     if (error) {
         console.error('Fetch error:', error);
         return res.status(500).json({ success: false, message: error.message });
@@ -557,26 +645,28 @@ app.get('/api/visitors', async (req, res) => {
 });
 
 // Add a visitor (entry)
-app.post('/api/visitors', async (req, res) => {
+app.post('/api/visitors', withAdmin, async (req, res) => {
     const b = req.body;
-    
+
     // Check if this plate is already in the system (no exit_time)
     const { data: existingVisitor } = await supabase
         .from('visitors')
         .select('id')
+        .eq('admin_id', req.adminId)
         .eq('license_plate', b.licensePlate)
         .is('exit_time', null)
         .limit(1);
 
     if (existingVisitor && existingVisitor.length > 0) {
-        return res.status(400).json({ 
-            success: false, 
-            message: `Vehicle with plate ${b.licensePlate} is already parked. Please scan again to exit.` 
+        return res.status(400).json({
+            success: false,
+            message: `Vehicle with plate ${b.licensePlate} is already parked. Please scan again to exit.`
         });
     }
-    
+
     const { data, error } = await supabase.from('visitors').insert([{
         id: b.id || Date.now().toString(),
+        admin_id: req.adminId,
         name: b.name,
         phone: b.phone,
         license_plate: b.licensePlate,
@@ -596,6 +686,7 @@ app.post('/api/visitors', async (req, res) => {
         await supabase
             .from('gate_notifications')
             .update({ status: 'opened', opened_at: new Date().toISOString() })
+            .eq('admin_id', req.adminId)
             .eq('license_plate', b.licensePlate)
             .eq('status', 'pending');
         console.log(`[GATE] Auto-dismissed notifications for plate ${b.licensePlate} (visitor entered)`);
@@ -607,7 +698,7 @@ app.post('/api/visitors', async (req, res) => {
 });
 
 // Update visitor (exit time and charge)
-app.post('/api/visitors/update', async (req, res) => {
+app.post('/api/visitors/update', withAdmin, async (req, res) => {
     const { id, exitTime, totalCharge } = req.body;
 
     const updates = {};
@@ -617,6 +708,7 @@ app.post('/api/visitors/update', async (req, res) => {
     const { data, error } = await supabase
         .from('visitors')
         .update(updates)
+        .eq('admin_id', req.adminId)
         .eq('id', id)
         .select();
 
@@ -627,7 +719,7 @@ app.post('/api/visitors/update', async (req, res) => {
 });
 
 // Extend visitor stay (can also be called from WhatsApp handler)
-app.post('/api/visitors/extend', async (req, res) => {
+app.post('/api/visitors/extend', withAdmin, async (req, res) => {
     const { phone, additionalHours } = req.body;
     if (!phone || !additionalHours) {
         return res.status(400).json({ success: false, message: 'phone and additionalHours are required' });
@@ -640,6 +732,7 @@ app.post('/api/visitors/extend', async (req, res) => {
     const { data: visitors, error: fetchErr } = await supabase
         .from('visitors')
         .select('*')
+        .eq('admin_id', req.adminId)
         .is('exit_time', null)
         .order('entry_time', { ascending: false });
 
@@ -656,6 +749,7 @@ app.post('/api/visitors/extend', async (req, res) => {
     const { error: updateErr } = await supabase
         .from('visitors')
         .update({ estimated_hours: newEstimatedHours, extension_notified_at: null })
+        .eq('admin_id', req.adminId)
         .eq('id', visitor.id);
 
     if (updateErr) return res.status(500).json({ success: false, message: updateErr.message });
@@ -669,11 +763,12 @@ app.post('/api/visitors/extend', async (req, res) => {
 // ============================================
 
 // Create a visitor request
-app.post('/api/visitor-requests', async (req, res) => {
+app.post('/api/visitor-requests', withAdmin, async (req, res) => {
     const spotSuffix = req.body.selectedSpot ? `-${req.body.selectedSpot}` : '';
     const hoursSuffix = req.body.estimatedHours ? `-H${req.body.estimatedHours}` : '';
     const requestData = {
         id: Date.now().toString() + spotSuffix + hoursSuffix,
+        admin_id: req.adminId,
         visitor_name: req.body.visitorName,
         visitor_phone: req.body.visitorPhone,
         license_plate: req.body.licensePlate,
@@ -698,7 +793,7 @@ app.post('/api/visitor-requests', async (req, res) => {
     };
 
     // TRIGGER PUSH NOTIFICATION
-    const subs = getSubscriptions();
+    const subs = await getSubscriptions(req.adminId);
     const sub = subs[request.visitingFlat.toUpperCase()];
     if (sub) {
         const payload = JSON.stringify({
@@ -713,10 +808,10 @@ app.post('/api/visitor-requests', async (req, res) => {
 });
 
 // Save Push Subscription
-app.post('/api/subscribe', (req, res) => {
+app.post('/api/subscribe', withAdmin, async (req, res) => {
     const { flatId, subscription } = req.body;
     if (!flatId || !subscription) return res.status(400).json({ success: false });
-    saveSubscription(flatId.toUpperCase(), subscription);
+    await saveSubscription(req.adminId, flatId, subscription);
     res.json({ success: true });
 });
 
@@ -726,18 +821,18 @@ app.get('/api/vapid-key', (req, res) => {
 });
 
 // Get pending requests for a specific flat
-app.get('/api/visitor-requests', async (req, res) => {
+app.get('/api/visitor-requests', withAdmin, async (req, res) => {
     const flatId = req.query.flatId;
     const status = req.query.status; // Optional: filter by status
 
-    // Always get ALL requests, then filter in JS for base flat matching
-    let query = supabase.from('visitor_requests').select('*');
-    
+    // Always get ALL requests for this admin, then filter in JS for base flat matching
+    let query = supabase.from('visitor_requests').select('*').eq('admin_id', req.adminId);
+
     // If status is specified, filter by it
     if (status) {
         query = query.eq('status', status);
     }
-    
+
     // Sort by most recent first
     query = query.order('created_at', { ascending: false });
 
@@ -767,12 +862,13 @@ app.get('/api/visitor-requests', async (req, res) => {
 });
 
 // Approve or reject a visitor request
-app.post('/api/visitor-requests/respond', async (req, res) => {
+app.post('/api/visitor-requests/respond', withAdmin, async (req, res) => {
     const { requestId, action } = req.body;
 
     const { data, error } = await supabase
         .from('visitor_requests')
         .update({ status: action, responded_at: new Date().toISOString() })
+        .eq('admin_id', req.adminId)
         .eq('id', requestId)
         .select();
 
@@ -782,9 +878,9 @@ app.post('/api/visitor-requests/respond', async (req, res) => {
     console.log(`[REQUEST] Visitor request ${requestId} was ${action}`);
 
     const request = data[0];
-    
-    res.json({ 
-        success: true, 
+
+    res.json({
+        success: true,
         request: {
             id: request.id,
             visitorName: request.visitor_name,
@@ -820,11 +916,12 @@ app.get('/api/visitor-requests/:id', async (req, res) => {
 // GATE NOTIFICATIONS (SUPABASE)
 // ============================================
 
-// Get all pending gate notifications (admin polls this)
-app.get('/api/gate-notifications', async (req, res) => {
+// Get all pending gate notifications for an admin
+app.get('/api/gate-notifications', withAdmin, async (req, res) => {
     const { data, error } = await supabase
         .from('gate_notifications')
         .select('*')
+        .eq('admin_id', req.adminId)
         .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
@@ -844,13 +941,14 @@ app.get('/api/gate-notifications', async (req, res) => {
 });
 
 // Admin dismisses (opens gate) for a notification
-app.post('/api/gate-notifications/dismiss', async (req, res) => {
+app.post('/api/gate-notifications/dismiss', withAdmin, async (req, res) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ success: false, message: 'id is required' });
 
     const { data, error } = await supabase
         .from('gate_notifications')
         .update({ status: 'opened', opened_at: new Date().toISOString() })
+        .eq('admin_id', req.adminId)
         .eq('id', id)
         .select();
 
@@ -861,7 +959,7 @@ app.post('/api/gate-notifications/dismiss', async (req, res) => {
 });
 
 // Trigger a gate notification (called after camera validation)
-app.post('/api/gate-notifications/trigger', async (req, res) => {
+app.post('/api/gate-notifications/trigger', withAdmin, async (req, res) => {
     let { requestId, licensePlate, visitingFlat, visitorName, visitorPhone, type } = req.body;
 
     // Normalize for robust deduplication
@@ -873,6 +971,7 @@ app.post('/api/gate-notifications/trigger', async (req, res) => {
     const { data: existingByRequest } = await supabase
         .from('gate_notifications')
         .select('id, status')
+        .eq('admin_id', req.adminId)
         .eq('request_id', requestId)
         .limit(1);
 
@@ -893,6 +992,7 @@ app.post('/api/gate-notifications/trigger', async (req, res) => {
     const { data: recentByPlate } = await supabase
         .from('gate_notifications')
         .select('id, status')
+        .eq('admin_id', req.adminId)
         .eq('license_plate', licensePlate)
         .eq('visiting_flat', visitingFlat)
         .gt('created_at', fiveMinsAgo)
@@ -909,6 +1009,7 @@ app.post('/api/gate-notifications/trigger', async (req, res) => {
     }
 
     const notif = {
+        admin_id: req.adminId,
         visitor_name: visitorName,
         visitor_phone: visitorPhone,
         license_plate: licensePlate,
@@ -931,10 +1032,11 @@ app.post('/api/gate-notifications/trigger', async (req, res) => {
 });
 
 // Get notification status (for visitor app polling by requestId)
-app.get('/api/gate-notifications/status-by-request/:requestId', async (req, res) => {
+app.get('/api/gate-notifications/status-by-request/:requestId', withAdmin, async (req, res) => {
     const { data, error } = await supabase
         .from('gate_notifications')
         .select('status')
+        .eq('admin_id', req.adminId)
         .eq('request_id', req.params.requestId)
         .order('created_at', { ascending: false })
         .limit(1);
@@ -946,10 +1048,11 @@ app.get('/api/gate-notifications/status-by-request/:requestId', async (req, res)
 });
 
 // Get notification status (for resident app polling)
-app.get('/api/gate-notifications/:id/status', async (req, res) => {
+app.get('/api/gate-notifications/:id/status', withAdmin, async (req, res) => {
     const { data, error } = await supabase
         .from('gate_notifications')
         .select('status')
+        .eq('admin_id', req.adminId)
         .eq('id', req.params.id)
         .single();
 
@@ -962,7 +1065,7 @@ app.get('/api/gate-notifications/:id/status', async (req, res) => {
 // ============================================
 
 // Get all blocked visitors for a resident flat
-app.get('/api/blocked-visitors', async (req, res) => {
+app.get('/api/blocked-visitors', withAdmin, async (req, res) => {
     const { flatId } = req.query;
     if (!flatId) return res.status(400).json({ success: false, message: 'flatId is required' });
 
@@ -971,6 +1074,7 @@ app.get('/api/blocked-visitors', async (req, res) => {
     const { data, error } = await supabase
         .from('blocked_visitors')
         .select('*')
+        .eq('admin_id', req.adminId)
         .eq('resident_flat_id', baseFlatId)
         .order('blocked_at', { ascending: false });
 
@@ -985,11 +1089,12 @@ app.get('/api/blocked-visitors', async (req, res) => {
     })));
 });
 
-// Get ALL blocked visitors (admin-wide view)
-app.get('/api/blocked-visitors/all', async (req, res) => {
+// Get ALL blocked visitors for an admin
+app.get('/api/blocked-visitors/all', withAdmin, async (req, res) => {
     const { data, error } = await supabase
         .from('blocked_visitors')
         .select('*')
+        .eq('admin_id', req.adminId)
         .order('blocked_at', { ascending: false });
 
     if (error) return res.status(500).json({ success: false, message: error.message });
@@ -1004,7 +1109,7 @@ app.get('/api/blocked-visitors/all', async (req, res) => {
 });
 
 // Check if a visitor is blocked for a specific flat
-app.get('/api/blocked-visitors/check', async (req, res) => {
+app.get('/api/blocked-visitors/check', withAdmin, async (req, res) => {
     const { flatId, phone } = req.query;
     if (!flatId || !phone) return res.status(400).json({ success: false, message: 'flatId and phone are required' });
 
@@ -1014,6 +1119,7 @@ app.get('/api/blocked-visitors/check', async (req, res) => {
     const { data, error } = await supabase
         .from('blocked_visitors')
         .select('id')
+        .eq('admin_id', req.adminId)
         .eq('resident_flat_id', baseFlatId)
         .eq('visitor_phone', cleanPhone)
         .maybeSingle();
@@ -1024,7 +1130,7 @@ app.get('/api/blocked-visitors/check', async (req, res) => {
 });
 
 // Check if a visitor has an active session currently
-app.post('/api/check-active', async (req, res) => {
+app.post('/api/check-active', withAdmin, async (req, res) => {
     const { phone, licensePlate } = req.body;
     if (!phone || !licensePlate) return res.status(400).json({ success: false, message: 'Missing fields' });
 
@@ -1034,6 +1140,7 @@ app.post('/api/check-active', async (req, res) => {
     const { data: visitors, error } = await supabase
         .from('visitors')
         .select('*')
+        .eq('admin_id', req.adminId)
         .is('exit_time', null);
 
     if (error) return res.status(500).json({ success: false, message: error.message });
@@ -1057,7 +1164,7 @@ app.post('/api/check-active', async (req, res) => {
 });
 
 // Block a visitor
-app.post('/api/blocked-visitors', async (req, res) => {
+app.post('/api/blocked-visitors', withAdmin, async (req, res) => {
     const { residentFlatId, visitorPhone, visitorName } = req.body;
     if (!residentFlatId || !visitorPhone) {
         return res.status(400).json({ success: false, message: 'residentFlatId and visitorPhone are required' });
@@ -1069,11 +1176,12 @@ app.post('/api/blocked-visitors', async (req, res) => {
     const { data, error } = await supabase
         .from('blocked_visitors')
         .upsert([{
+            admin_id: req.adminId,
             resident_flat_id: baseFlatId,
             visitor_phone: cleanPhone,
             visitor_name: visitorName || null,
             blocked_at: new Date().toISOString()
-        }], { onConflict: 'resident_flat_id,visitor_phone' })
+        }], { onConflict: 'admin_id,resident_flat_id,visitor_phone' })
         .select();
 
     if (error) return res.status(500).json({ success: false, message: error.message });
@@ -1088,7 +1196,7 @@ app.post('/api/blocked-visitors', async (req, res) => {
 });
 
 // Unblock a visitor
-app.delete('/api/blocked-visitors', async (req, res) => {
+app.delete('/api/blocked-visitors', withAdmin, async (req, res) => {
     const { residentFlatId, visitorPhone } = req.body;
     if (!residentFlatId || !visitorPhone) {
         return res.status(400).json({ success: false, message: 'residentFlatId and visitorPhone are required' });
@@ -1100,6 +1208,7 @@ app.delete('/api/blocked-visitors', async (req, res) => {
     const { error } = await supabase
         .from('blocked_visitors')
         .delete()
+        .eq('admin_id', req.adminId)
         .eq('resident_flat_id', baseFlatId)
         .eq('visitor_phone', cleanPhone);
 
@@ -1121,12 +1230,12 @@ app.listen(PORT, async () => {
     console.log(`  ✓  Database: Supabase (Cloud)\n`);
 
     console.log('  ✓  WhatsApp OTP mode active.');
-    
+
     // Initialize session store after supabase is ready
     if (supabase) {
         whatsappSessionStore = new SupabaseSessionStore(supabase);
         console.log('📱 WhatsApp session store initialized');
-        
+
         // Try to restore session from database
         try {
             const savedSession = await whatsappSessionStore.read();
@@ -1141,7 +1250,7 @@ app.listen(PORT, async () => {
     } else {
         console.log('  ➤  No Supabase connection. Using local session only.\n');
     }
-    
+
     waClient.initialize();
 });
 

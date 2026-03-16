@@ -75,6 +75,52 @@
             margin-bottom: 8px;
         }
 
+        /* ===== PASSWORD INPUT WITH TOGGLE ===== */
+        .password-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group input[type="password"],
+        .input-group input[type="text"].password-visible {
+            width: 100%;
+            padding: 14px 16px;
+            padding-right: 45px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .input-group input[type="password"]:focus,
+        .input-group input[type="text"].password-visible:focus {
+            border-color: var(--primary);
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 14px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 6px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            font-size: 18px;
+        }
+
+        .password-toggle-btn:hover {
+            color: var(--primary);
+        }
+
         .input-group input {
             width: 100%;
             padding: 14px 16px;
@@ -200,7 +246,13 @@
                 </div>
                 <div class="input-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" required placeholder="Enter password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="password" required placeholder="Enter password">
+                        <button type="button" class="password-toggle-btn" id="password-toggle"
+                            title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
                 </div>
                 <!-- Forgot Password Link -->
                 <div style="text-align: right; margin-bottom: 15px;">
@@ -212,8 +264,52 @@
                     style="color: var(--danger); display: none; margin-bottom: 15px; min-height: 0;">Invalid username or
                     password.</div>
                 <button type="submit" class="btn btn-primary">Login to Dashboard</button>
+                <div style="text-align: center; margin-top: 15px;">
+                    <span style="color: var(--text-muted); font-size: 14px;">New admin?</span>
+                    <a href="#" class="btn btn-text" id="goto-register-link"
+                        style="padding: 0; font-size: 14px; text-decoration: underline; width: auto; display: inline; margin-left: 5px;">Register
+                        here</a>
+                </div>
                 <a href="index.html" class="btn btn-text"
-                    style="display: block; text-align: center; text-decoration: none;">Go to Visitor Gate</a>
+                    style="display: block; text-align: center; text-decoration: none; margin-top: 10px;">Go to Visitor
+                    Gate</a>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== REGISTER SCREEN ===== -->
+    <div id="screen-register" class="login-wrapper auth-screen">
+        <div class="login-card">
+            <div class="admin-logo">
+                <img src="logo.png" alt="SmartParkk Logo" style="width: 64px; height: 64px;">
+            </div>
+            <div class="header">
+                <h1>Admin <span class="highlight">Registration</span></h1>
+                <p>Create a new admin account</p>
+            </div>
+            <form id="register-form">
+                <div class="input-group">
+                    <label for="reg-username">Username</label>
+                    <input type="text" id="reg-username" required placeholder="Create username">
+                </div>
+                <div class="input-group">
+                    <label for="reg-password">Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="reg-password" required placeholder="Create password">
+                        <button type="button" class="password-toggle-btn" id="reg-password-toggle"
+                            title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="reg-phone">Phone Number</label>
+                    <input type="text" id="reg-phone" required placeholder="Enter 10-digit phone number">
+                </div>
+                <div class="status-msg" id="register-msg"
+                    style="display: none; margin-bottom: 15px; min-height: 0; font-size: 14px;"></div>
+                <button type="submit" class="btn btn-primary">Create Account</button>
+                <button type="button" class="btn btn-text" id="register-back-login">Back to Login</button>
             </form>
         </div>
     </div>
@@ -270,11 +366,23 @@
             <form id="reset-form">
                 <div class="input-group">
                     <label for="new-password">New Password</label>
-                    <input type="password" id="new-password" required placeholder="Enter new password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="new-password" required placeholder="Enter new password">
+                        <button type="button" class="password-toggle-btn" id="new-password-toggle"
+                            title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
                 </div>
                 <div class="input-group">
                     <label for="confirm-password">Confirm Password</label>
-                    <input type="password" id="confirm-password" required placeholder="Confirm new password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="confirm-password" required placeholder="Confirm new password">
+                        <button type="button" class="password-toggle-btn" id="confirm-password-toggle"
+                            title="Show/hide password">
+                            👁️
+                        </button>
+                    </div>
                 </div>
                 <div class="status-msg" id="reset-error"
                     style="color: var(--danger); display: none; margin-bottom: 15px; min-height: 0;">Passwords do
@@ -335,13 +443,6 @@
                         <path d="M9 8v8" />
                     </svg>
                     Parking Lot
-                </a>
-                <a href="#" class="nav-item" id="tab-gate-camera">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                    </svg>
-                    Gate Camera
                 </a>
                 <a href="#" class="nav-item" id="tab-blocked">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

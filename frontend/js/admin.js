@@ -75,31 +75,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const loginError = document.getElementById('login-error');
 
-    loginForm.addEventListener('submit', (e) => {
+    loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const user = document.getElementById('username').value.trim();
         const pass = document.getElementById('password').value;
 
-        // Hardcoded demo credentials
-        if (user === 'admin' && pass === 'admin123') {
-            sessionStorage.setItem('smartpark_admin_auth', 'true');
-            sessionStorage.setItem('smartpark_admin_time', Date.now().toString());
-            showDashboard();
-        } else {
-            loginError.style.display = 'block';
+        const btn = loginForm.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.textContent = 'Logging in...';
 
-            // Shake animation for error
-            const card = loginForm.closest('.login-card');
-            card.style.transform = 'translate(-5px, 0)';
-            setTimeout(() => card.style.transform = 'translate(5px, 0)', 50);
-            setTimeout(() => card.style.transform = 'translate(-5px, 0)', 100);
-            setTimeout(() => card.style.transform = 'translate(5px, 0)', 150);
-            setTimeout(() => card.style.transform = 'translate(0, 0)', 200);
+        try {
+            const res = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                sessionStorage.setItem('smartpark_admin_auth', 'true');
+                sessionStorage.setItem('smartpark_admin_id', data.admin.id);
+                sessionStorage.setItem('smartpark_admin_time', Date.now().toString());
+                showDashboard();
+            } else {
+                loginError.textContent = data.message || 'Invalid username or password.';
+                loginError.style.display = 'block';
+
+                // Shake animation for error
+                const card = loginForm.closest('.login-card');
+                card.style.transform = 'translate(-5px, 0)';
+                setTimeout(() => card.style.transform = 'translate(5px, 0)', 50);
+                setTimeout(() => card.style.transform = 'translate(-5px, 0)', 100);
+                setTimeout(() => card.style.transform = 'translate(5px, 0)', 150);
+                setTimeout(() => card.style.transform = 'translate(0, 0)', 200);
+            }
+        } catch (err) {
+            alert('Server not reachable. Make sure backend is running.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Login to Dashboard';
         }
     });
 
     // Navigation links
+    document.getElementById('goto-register-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        showAuthScreen('screen-register');
+    });
+
+    document.getElementById('register-back-login').addEventListener('click', () => {
+        showAuthScreen('screen-login');
+    });
     document.getElementById('goto-forgot-link').addEventListener('click', (e) => {
         e.preventDefault();
         showAuthScreen('screen-forgot');
@@ -250,6 +277,84 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ============================================
+    // REGISTRATION FLOW
+    // ============================================
+    const registerForm = document.getElementById('register-form');
+    const registerMsg = document.getElementById('register-msg');
+
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById('reg-username').value.trim();
+        const password = document.getElementById('reg-password').value;
+        const phone = document.getElementById('reg-phone').value.trim();
+
+        if (phone.length < 10) {
+            registerMsg.textContent = 'Please enter a valid 10-digit phone number.';
+            registerMsg.style.color = 'var(--danger)';
+            registerMsg.style.display = 'block';
+            return;
+        }
+
+        const btn = registerForm.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.textContent = 'Creating account...';
+
+        try {
+            const res = await fetch('/api/admin/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, phone })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                registerMsg.textContent = 'Registration successful! Redirecting to login...';
+                registerMsg.style.color = 'var(--success)';
+                registerMsg.style.display = 'block';
+
+                setTimeout(() => {
+                    registerForm.reset();
+                    registerMsg.style.display = 'none';
+                    showAuthScreen('screen-login');
+                }, 2000);
+            } else {
+                registerMsg.textContent = data.message || 'Registration failed.';
+                registerMsg.style.color = 'var(--danger)';
+                registerMsg.style.display = 'block';
+            }
+        } catch (err) {
+            alert('Server error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Create Account';
+        }
+    });
+
+    // Password Toggle Logic
+    function setupPasswordToggle(inputId, toggleId) {
+        const input = document.getElementById(inputId);
+        const toggle = document.getElementById(toggleId);
+        if (!input || !toggle) return;
+
+        toggle.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent focus loss or form issues
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            toggle.textContent = isPassword ? '🙈' : '👁️';
+            toggle.title = isPassword ? 'Hide password' : 'Show password';
+
+            if (!isPassword) input.classList.remove('password-visible');
+            else input.classList.add('password-visible');
+        });
+    }
+
+    setupPasswordToggle('password', 'password-toggle');
+    setupPasswordToggle('new-password', 'new-password-toggle');
+    setupPasswordToggle('confirm-password', 'confirm-password-toggle');
+    setupPasswordToggle('reg-password', 'reg-password-toggle');
+
+    // ============================================
     // DASHBOARD LOGIC
     // ============================================
 
@@ -257,8 +362,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dashboardInitialized) return;
         dashboardInitialized = true;
 
+        const adminId = sessionStorage.getItem('smartpark_admin_id');
+
         // Load saved settings from backend (sync across devices)
-        fetch('/api/settings')
+        fetch(`/api/settings?adminId=${adminId}`)
             .then(res => res.json())
             .then(settings => {
                 settings.forEach(s => {
@@ -416,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: 'smartpark_total_parking', value: val.toString() })
+                    body: JSON.stringify({ adminId: sessionStorage.getItem('smartpark_admin_id'), key: 'smartpark_total_parking', value: val.toString() })
                 }).catch(err => console.error('[SETTINGS] Save error:', err));
             }
             totalDisplay.style.display = 'inline';
@@ -468,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: 'smartpark_rate_per_hour', value: val.toString() })
+                    body: JSON.stringify({ adminId: sessionStorage.getItem('smartpark_admin_id'), key: 'smartpark_rate_per_hour', value: val.toString() })
                 }).catch(err => console.error('[SETTINGS] Save error:', err));
             }
             rateDisplay.style.display = 'inline';
@@ -519,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: 'smartpark_fine_amount', value: val.toString() })
+                    body: JSON.stringify({ adminId: sessionStorage.getItem('smartpark_admin_id'), key: 'smartpark_fine_amount', value: val.toString() })
                 }).catch(err => console.error('[SETTINGS] Save error:', err));
             }
             fineDisplay.style.display = 'inline';
@@ -560,7 +667,8 @@ function updateParkingStats(activeCount) {
 
 async function loadTableData() {
     try {
-        const res = await fetch('/api/visitors');
+        const adminId = sessionStorage.getItem('smartpark_admin_id');
+        const res = await fetch(`/api/visitors?adminId=${adminId}`);
         const entries = await res.json();
 
         const logsBody = document.getElementById('logs-body');
@@ -697,7 +805,8 @@ async function loadTableData() {
 
 async function loadResidentsData() {
     try {
-        const res = await fetch('/api/residents');
+        const adminId = sessionStorage.getItem('smartpark_admin_id');
+        const res = await fetch(`/api/residents?adminId=${adminId}`);
         const residents = await res.json();
 
         const residentsBody = document.getElementById('residents-body');
@@ -767,15 +876,20 @@ function saveNotifState() {
 
 let _isPollingGateNotifs = false;
 
+// Poll Gate Notifications
 async function pollGateNotifications() {
-    if (_isPollingGateNotifs) return;
-    // Only run if dashboard is visible (admin is logged in)
-    const dashboard = document.getElementById('admin-dashboard');
-    if (!dashboard || !dashboard.classList.contains('active')) return;
-
-    _isPollingGateNotifs = true;
     try {
-        const res = await fetch('/api/gate-notifications');
+        const adminId = sessionStorage.getItem('smartpark_admin_id');
+        if (!adminId) return;
+
+        // Only run if dashboard is visible (admin is logged in)
+        const dashboard = document.getElementById('admin-dashboard');
+        if (!dashboard || !dashboard.classList.contains('active')) return;
+
+        if (_isPollingGateNotifs) return;
+        _isPollingGateNotifs = true;
+
+        const res = await fetch(`/api/gate-notifications?adminId=${adminId}`);
         if (!res.ok) return;
         const notifications = await res.json();
 
@@ -1256,7 +1370,8 @@ async function renderParkingLot() {
     // Fetch currently active visitors (no exitTime)
     let activeVisitors = [];
     try {
-        const res = await fetch('/api/visitors');
+        const adminId = sessionStorage.getItem('smartpark_admin_id');
+        const res = await fetch(`/api/visitors?adminId=${adminId}`);
         const all = await res.json();
         const now = Date.now();
         const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -1354,7 +1469,8 @@ let _allBlockedVisitors = [];
 
 async function loadBlockedVisitors() {
     try {
-        const res = await fetch('/api/blocked-visitors/all');
+        const adminId = sessionStorage.getItem('smartpark_admin_id');
+        const res = await fetch(`/api/blocked-visitors/all?adminId=${adminId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         _allBlockedVisitors = await res.json();
     } catch (err) {
@@ -1433,10 +1549,11 @@ async function adminUnblockVisitor(residentFlatId, visitorPhone, btnEl) {
     }
 
     try {
+        const adminId = sessionStorage.getItem('smartpark_admin_id');
         const res = await fetch('/api/blocked-visitors', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ residentFlatId, visitorPhone })
+            body: JSON.stringify({ residentFlatId, visitorPhone, adminId })
         });
         const data = await res.json();
         if (data.success) {

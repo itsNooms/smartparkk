@@ -13,12 +13,19 @@ let visitorData = {
     selectedSpot: null   // e.g. { label: 'N03', type: 'normal' }
 };
 
+// Get current adminId from URL
+function getCurrentAdminId() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('adminId') || '1';
+}
+
 // =============================================
 // GLOBAL SETTINGS SYNC (from Backend)
 // =============================================
 async function syncSettings() {
     try {
-        const res = await fetch('/api/settings');
+        const adminId = getCurrentAdminId();
+        const res = await fetch(`/api/settings?adminId=${adminId}`);
         const settings = await res.json();
         settings.forEach(s => {
             if (s.key === 'smartpark_total_parking') {
@@ -47,7 +54,8 @@ let lastSpotCount = null;
 
 async function fetchAndUpdateSpots() {
     try {
-        const res = await fetch('/api/visitors');
+        const adminId = getCurrentAdminId();
+        const res = await fetch(`/api/visitors?adminId=${adminId}`);
         const all = await res.json();
         const now = Date.now();
         const ONE_DAY = 24 * 60 * 60 * 1000;
@@ -179,7 +187,8 @@ function updateEstimate(hours) {
 // Storage Helpers
 async function saveToStorage(data) {
     try {
-        await fetch('/api/visitors', {
+        const adminId = getCurrentAdminId();
+        await fetch(`/api/visitors?adminId=${adminId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -189,7 +198,8 @@ async function saveToStorage(data) {
 
 async function updateStorage(data) {
     try {
-        await fetch('/api/visitors/update', {
+        const adminId = getCurrentAdminId();
+        await fetch(`/api/visitors/update?adminId=${adminId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -673,8 +683,9 @@ registerForm.addEventListener('submit', async (e) => {
 
     // ── BLOCK CHECK ──────────────────────────────
     try {
+        const adminId = getCurrentAdminId();
         const blockRes = await fetch(
-            `/api/blocked-visitors/check?flatId=${encodeURIComponent(visitorData.visitingFlat)}&phone=${encodeURIComponent(visitorData.phone)}`
+            `/api/blocked-visitors/check?adminId=${adminId}&flatId=${encodeURIComponent(visitorData.visitingFlat)}&phone=${encodeURIComponent(visitorData.phone)}`
         );
         const blockData = await blockRes.json();
 
@@ -695,7 +706,8 @@ registerForm.addEventListener('submit', async (e) => {
 
     // ── ACTIVE CHECK ──────────────────────────────
     try {
-        const dupRes = await fetch('/api/check-active', {
+        const adminId = getCurrentAdminId();
+        const dupRes = await fetch(`/api/check-active?adminId=${adminId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone: visitorData.phone, licensePlate: visitorData.licensePlate })
@@ -715,7 +727,8 @@ registerForm.addEventListener('submit', async (e) => {
 
     // ── RESIDENT AVAILABILITY CHECK ──────────────
     try {
-        const residentsRes = await fetch('/api/residents');
+        const adminId = getCurrentAdminId();
+        const residentsRes = await fetch(`/api/residents?adminId=${adminId}`);
         const residents = await residentsRes.json();
 
         // Find resident(s) for the visiting flat
@@ -801,7 +814,8 @@ otpForm.addEventListener('submit', async (e) => {
     btn.textContent = 'Verifying...';
 
     try {
-        const res = await fetch('/api/verify-otp', {
+        const adminId = getCurrentAdminId();
+        const res = await fetch(`/api/verify-otp?adminId=${adminId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone: visitorData.phone, otp: otpEntered })
@@ -811,7 +825,7 @@ otpForm.addEventListener('submit', async (e) => {
         if (data.success) {
             // OTP verified — now create a visitor request for the resident
             try {
-                const reqRes = await fetch('/api/visitor-requests', {
+                const reqRes = await fetch(`/api/visitor-requests?adminId=${adminId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -857,7 +871,8 @@ function startApprovalPolling() {
         if (!pendingRequestId) return;
 
         try {
-            const res = await fetch(`/api/visitor-requests/${pendingRequestId}`);
+            const adminId = getCurrentAdminId();
+            const res = await fetch(`/api/visitor-requests/${pendingRequestId}?adminId=${adminId}`);
             const data = await res.json();
 
             if (data.status === 'approved') {
@@ -900,7 +915,8 @@ async function requestAdminAccess() {
     showScreen('screen-admin-wait');
 
     try {
-        const res = await fetch('/api/gate-notifications/trigger', {
+        const adminId = getCurrentAdminId();
+        const res = await fetch(`/api/gate-notifications/trigger?adminId=${adminId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -941,7 +957,8 @@ function pollAdminGateAction(notifId) {
 
     const pollInterval = setInterval(async () => {
         try {
-            const res = await fetch(pollUrl);
+            const adminId = getCurrentAdminId();
+            const res = await fetch(pollUrl + (pollUrl.includes('?') ? '&' : '?') + 'adminId=' + adminId);
             if (!res.ok) return;
             const data = await res.json();
 
@@ -1085,7 +1102,8 @@ async function showParkingModal(type) {
     // Fetch live visitor data
     let activeVisitors = [];
     try {
-        const res = await fetch('/api/visitors');
+        const adminId = getCurrentAdminId();
+        const res = await fetch(`/api/visitors?adminId=${adminId}`);
         const all = await res.json();
         const now = Date.now();
         const ONE_DAY = 24 * 60 * 60 * 1000;
