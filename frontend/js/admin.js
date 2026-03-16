@@ -372,6 +372,45 @@ document.addEventListener('DOMContentLoaded', () => {
             loadBlockedVisitors();
         });
 
+        // Change Password Modal
+        const changePassModal = document.getElementById('change-password-modal');
+        const cpNewPass = document.getElementById('cp-new-pass');
+        const cpConfirmPass = document.getElementById('cp-confirm-pass');
+        const cpError = document.getElementById('cp-error');
+        
+        document.getElementById('change-password-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            cpNewPass.value = '';
+            cpConfirmPass.value = '';
+            cpError.style.display = 'none';
+            changePassModal.style.display = 'flex';
+        });
+
+        document.getElementById('cp-cancel-btn').addEventListener('click', () => {
+            changePassModal.style.display = 'none';
+        });
+
+        document.getElementById('cp-save-btn').addEventListener('click', () => {
+            const newPass = cpNewPass.value;
+            const confirmPass = cpConfirmPass.value;
+
+            if (newPass.length < 6) {
+                cpError.textContent = 'Password must be at least 6 characters';
+                cpError.style.display = 'block';
+                return;
+            }
+
+            if (newPass !== confirmPass) {
+                cpError.textContent = 'Passwords do not match';
+                cpError.style.display = 'block';
+                return;
+            }
+
+            localStorage.setItem('smartpark_admin_creds', JSON.stringify({ username: 'admin', password: newPass }));
+            changePassModal.style.display = 'none';
+            alert('Password changed successfully!');
+        });
+
         // Logout
         document.getElementById('logout-btn').addEventListener('click', (e) => {
             e.preventDefault();
