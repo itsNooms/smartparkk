@@ -1682,7 +1682,7 @@ async function startDashboardScan() {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ id: triggerData.notificationId })
                             });
-                            
+
                             // Also add visitor to the visitors table with entry time
                             const entryRes = await fetch('/api/visitors', {
                                 method: 'POST',
@@ -1696,7 +1696,7 @@ async function startDashboardScan() {
                                     entryTime: new Date().toISOString()
                                 })
                             });
-                            
+
                             entryWrap.style.display = 'none';
                             overlay.style.display = 'none';
                             statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Entry recorded!`;
@@ -1838,7 +1838,7 @@ async function adminGateContinuousScan() {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ id: triggerData.notificationId })
                             });
-                            
+
                             // Also add visitor to the visitors table with entry time
                             const entryRes = await fetch('/api/visitors', {
                                 method: 'POST',
@@ -1852,7 +1852,7 @@ async function adminGateContinuousScan() {
                                     entryTime: new Date().toISOString()
                                 })
                             });
-                            
+
                             entryWrap.style.display = 'none';
                             overlay.style.display = 'none';
                             statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Entry recorded!`;
