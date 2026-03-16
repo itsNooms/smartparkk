@@ -1709,58 +1709,6 @@ async function startDashboardScan() {
                     }
                     break;
                 }
-
-                // 3. If not found in either, show message
-                statusMsg.textContent = `❌ Plate not found in system`;
-                setTimeout(startDashboardScan, 3000);
-                break;
-            } else {
-                overlay.style.display = 'none';
-                statusMsg.textContent = "Scanning for plates...";
-            }
-                    break;
-                }
-
-                // 2. Check for EXIT
-                let matchedVisitor = null;
-                try {
-                    const visRes = await fetch('/api/visitors');
-                    const visitors = await visRes.json();
-                    matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate), cleanText));
-                } catch (e) { }
-
-                if (matchedVisitor) {
-                    statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
-
-                    const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
-                    const entryMs = new Date(matchedVisitor.entryTime).getTime();
-                    const diffHrs = (Date.now() - entryMs) / 3600000;
-                    const FINE_AMOUNT = getFineAmount();
-                    const totalCharge = (Math.max(diffHrs * parseFloat(savedRate), 0)) + (Date.now() - entryMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
-
-                    await fetch('/api/visitors/update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            id: matchedVisitor.id,
-                            exitTime: new Date().toISOString(),
-                            totalCharge: totalCharge
-                        })
-                    });
-
-                    statusMsg.textContent = `🚗 Vehicle exit processed: ${cleanText}`;
-                    exitPlateText.textContent = `Plate: ${cleanText}`;
-                    exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
-                    exitWrap.style.display = 'block';
-
-                    setTimeout(() => {
-                        exitWrap.style.display = 'none';
-                        overlay.style.display = 'none';
-                        statusMsg.textContent = `Resuming scan...`;
-                        startDashboardScan();
-                    }, 6000);
-                    break;
-                }
             } else {
                 overlay.style.display = 'none';
                 statusMsg.textContent = "Scanning for plates...";
