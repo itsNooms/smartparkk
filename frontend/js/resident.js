@@ -11,24 +11,14 @@ let currentResident = null;
 let resettingFlatId = null;
 let pendingResetPhone = null;
 
-// Get current adminId from URL or session
-function getCurrentAdminId() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlAdminId = urlParams.get('adminId');
-    if (urlAdminId) {
-        localStorage.setItem('smartpark_resident_admin_id', urlAdminId);
-        return urlAdminId;
-    }
-    return localStorage.getItem('smartpark_resident_admin_id') || '1';
-}
+// Block modal state
+let _blockModalAction = null; // 'block' | 'unblock'
+let _blockModalData = null;   // { phone, name }
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
     checkSession();
     registerServiceWorker();
-
-    // If adminId is in URL, ensure it's saved
-    getCurrentAdminId();
 });
 
 // PWA: Service Worker registration
@@ -74,8 +64,7 @@ async function subscribeUserToPush() {
 
         // Send subscription to server
         if (currentResident) {
-            const adminId = currentResident.adminId;
-            await fetch(`/api/subscribe?adminId=${adminId}`, {
+            await fetch('/api/subscribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -164,8 +153,7 @@ registerForm.addEventListener('submit', async (e) => {
         btn.disabled = true;
         btn.textContent = 'Registering...';
 
-        const adminId = getCurrentAdminId();
-        const res = await fetch(`/api/residents?adminId=${adminId}`);
+        const res = await fetch('/api/residents');
         const residents = await res.json();
 
         const existing = residents.find(r => r.flatInput === flatInput);
@@ -176,9 +164,9 @@ registerForm.addEventListener('submit', async (e) => {
             return;
         }
 
-        const newResident = { id: Date.now().toString(), adminId, name, flatInput, baseFlatId, role, phone, carPlate, password, isAvailable: true };
+        const newResident = { id: Date.now().toString(), name, flatInput, baseFlatId, role, phone, carPlate, password, isAvailable: true };
 
-        const resPost = await fetch(`/api/residents?adminId=${adminId}`, {
+        const resPost = await fetch('/api/residents', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newResident)
@@ -216,26 +204,15 @@ loginForm.addEventListener('submit', async (e) => {
         btn.disabled = true;
         btn.textContent = 'Logging in...';
 
-        const adminId = getCurrentAdminId();
-        const res = await fetch(`/api/residents?adminId=${adminId}`);
+        const res = await fetch('/api/residents');
         const residents = await res.json();
 
         const resident = residents.find(r => r.flatInput === flatInput && r.password === password);
 
         if (resident) {
             // Exclude password from session
-            const sessionData = {
-                id: resident.id,
-                adminId: resident.adminId || adminId,
-                name: resident.name,
-                flatInput: resident.flatInput,
-                baseFlatId: resident.baseFlatId,
-                role: resident.role,
-                carPlate: resident.carPlate || 'N/A',
-                isAvailable: resident.isAvailable !== false
-            };
+            const sessionData = { id: resident.id, name: resident.name, flatInput: resident.flatInput, baseFlatId: resident.baseFlatId, role: resident.role, carPlate: resident.carPlate || 'N/A', isAvailable: resident.isAvailable !== false };
             localStorage.setItem('smartpark_resident_session', JSON.stringify(sessionData));
-            localStorage.setItem('smartpark_resident_admin_id', sessionData.adminId);
             currentResident = sessionData;
 
             loginForm.reset();
@@ -265,8 +242,7 @@ forgotForm.addEventListener('submit', async (e) => {
         btn.disabled = true;
         btn.textContent = 'Sending OTP...';
 
-        const adminId = getCurrentAdminId();
-        const resAll = await fetch(`/api/residents?adminId=${adminId}`);
+        const resAll = await fetch('/api/residents');
         const residents = await resAll.json();
 
         const resident = residents.find(r => r.flatInput === flatInput && r.phone === phone);
@@ -418,8 +394,7 @@ resetForm.addEventListener('submit', async (e) => {
         btn.disabled = true;
         btn.textContent = 'Saving...';
 
-        const adminId = currentResident.adminId;
-        const updateRes = await fetch(`/api/residents/update?adminId=${adminId}`, {
+        const updateRes = await fetch('/api/residents/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ flatInput: resettingFlatId, password: newPassword })
@@ -454,8 +429,7 @@ if (availabilityBtn) {
         const newStatus = !currentResident.isAvailable;
 
         try {
-            const adminId = currentResident.adminId;
-            const res = await fetch(`/api/residents/update?adminId=${adminId}`, {
+            const res = await fetch('/api/residents/update', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ flatInput: currentResident.flatInput, isAvailable: newStatus })
@@ -556,10 +530,9 @@ async function loadPendingApprovals() {
     if (!container) return;
 
     try {
-        const adminId = currentResident.adminId;
         const baseFlatId = currentResident.baseFlatId || currentResident.flatInput;
         // Only load PENDING requests
-        const res = await fetch(`/api/visitor-requests?adminId=${adminId}&flatId=${encodeURIComponent(baseFlatId)}&status=pending`);
+        const res = await fetch(`/api/visitor-requests?flatId=${encodeURIComponent(baseFlatId)}&status=pending`);
         const requests = await res.json();
 
         if (!requests || requests.length === 0) {
@@ -603,8 +576,7 @@ async function respondToRequest(requestId, action, btnEl) {
     btnEl.textContent = action === 'approved' ? 'Approving...' : 'Rejecting...';
 
     try {
-        const adminId = currentResident.adminId;
-        const res = await fetch(`/api/visitor-requests/respond?adminId=${adminId}`, {
+        const res = await fetch('/api/visitor-requests/respond', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requestId, action })
@@ -719,8 +691,7 @@ async function confirmBlockAction() {
 async function blockVisitor(phone, name) {
     if (!currentResident) return;
     try {
-        const adminId = currentResident.adminId;
-        const res = await fetch(`/api/blocked-visitors?adminId=${adminId}`, {
+        const res = await fetch('/api/blocked-visitors', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -748,8 +719,7 @@ async function blockVisitor(phone, name) {
 async function unblockVisitor(phone, name) {
     if (!currentResident) return;
     try {
-        const adminId = currentResident.adminId;
-        const res = await fetch(`/api/blocked-visitors?adminId=${adminId}`, {
+        const res = await fetch('/api/blocked-visitors', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -773,14 +743,13 @@ async function unblockVisitor(phone, name) {
 async function rejectPendingByPhone(phone) {
     // Auto-reject any pending request from the newly-blocked visitor
     try {
-        const adminId = currentResident.adminId;
         const baseFlatId = currentResident.baseFlatId || currentResident.flatInput;
-        const res = await fetch(`/api/visitor-requests?adminId=${adminId}&flatId=${encodeURIComponent(baseFlatId)}`);
+        const res = await fetch(`/api/visitor-requests?flatId=${encodeURIComponent(baseFlatId)}`);
         const requests = await res.json();
         const cleanPhone = phone.replace(/\D/g, '').slice(-10);
         const matches = (requests || []).filter(r => r.visitorPhone.replace(/\D/g, '').slice(-10) === cleanPhone);
         for (const req of matches) {
-            await fetch(`/api/visitor-requests/respond?adminId=${adminId}`, {
+            await fetch('/api/visitor-requests/respond', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ requestId: req.id, action: 'rejected' })
@@ -799,9 +768,8 @@ async function loadBlockedVisitors() {
     if (!container) return;
 
     try {
-        const adminId = currentResident.adminId;
         const flatId = currentResident.flatInput;
-        const res = await fetch(`/api/blocked-visitors?adminId=${adminId}&flatId=${encodeURIComponent(flatId)}`);
+        const res = await fetch(`/api/blocked-visitors?flatId=${encodeURIComponent(flatId)}`);
         const blocked = await res.json();
 
         if (!blocked || blocked.length === 0) {
