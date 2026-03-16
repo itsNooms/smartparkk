@@ -293,6 +293,62 @@ app.post('/api/admin/register', async (req, res) => {
             }
             return res.status(500).json({ success: false, message: error.message });
         }
+        res.json({ success: true, admin: { username: data[0].username } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Admin login
+app.post('/api/admin/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    // Backward compatibility for hardcoded demo account
+    if (username === 'admin' && password === 'Admin@123') {
+        return res.json({ success: true, admin: { username: 'admin' } });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('admins')
+            .select('*')
+            .eq('username', username)
+            .eq('password', password) // In a real app, use hashed passwords!
+            .single();
+
+        if (error || !data) {
+            return res.status(401).json({ success: false, message: 'Invalid username or password' });
+        }
+
+        res.json({ success: true, admin: { username: data.username, email: data.email } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ============================================
+// ADMIN AUTH API (SUPABASE)
+// ============================================
+
+// Register an admin
+app.post('/api/admin/register', async (req, res) => {
+    const { username, password, phone } = req.body;
+    if (!username || !password || !phone) {
+        return res.status(400).json({ success: false, message: 'Username, password, and phone are required' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('admins')
+            .insert([{ username, password, phone }])
+            .select();
+
+        if (error) {
+            if (error.code === '23505') {
+                return res.status(400).json({ success: false, message: 'Username already exists' });
+            }
+            return res.status(500).json({ success: false, message: error.message });
+        }
         res.json({ success: true, admin: { id: data[0].id, username: data[0].username } });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -825,8 +881,8 @@ app.get('/api/visitor-requests', withAdmin, async (req, res) => {
     const flatId = req.query.flatId;
     const status = req.query.status; // Optional: filter by status
 
-    // Always get ALL requests for this admin, then filter in JS for base flat matching
-    let query = supabase.from('visitor_requests').select('*').eq('admin_id', req.adminId);
+    // Always get ALL requests, then filter in JS for base flat matching
+    let query = supabase.from('visitor_requests').select('*');
 
     // If status is specified, filter by it
     if (status) {
