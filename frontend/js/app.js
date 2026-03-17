@@ -478,7 +478,7 @@ async function continuousScan(videoId, callback, timeoutMs) {
                 isScanning = false;
                 overlay.style.display = 'block';
                 overlay.textContent = visitorData.licensePlate;
-                statusMsg.textContent = "✅ Plate Matched! Validating...";
+                statusMsg.textContent = "✅ Plate Scanning! Validating...";
 
                 setTimeout(() => {
                     container.classList.remove('scanning');
@@ -818,7 +818,9 @@ otpForm.addEventListener('submit', async (e) => {
                         visitorName: visitorData.name,
                         visitorPhone: visitorData.phone,
                         licensePlate: visitorData.licensePlate,
-                        visitingFlat: visitorData.visitingFlat
+                        visitingFlat: visitorData.visitingFlat,
+                        selectedSpot: visitorData.selectedSpot ? visitorData.selectedSpot.label : '',
+                        estimatedHours: visitorData.estimatedHours
                     })
                 });
                 const reqData = await reqRes.json();
@@ -968,7 +970,8 @@ function pollAdminGateAction(notifId) {
 
 function startParking() {
     visitorData.entryTime = new Date();
-    // Use the requestId as the ID to avoid duplicates with the admin side
+    // Use the requestId as the ID to preserve the spot-suffix (e.g. 17107...-A05)
+    // This allows the Admin Parking Lot to correctly place the vehicle in its spot.
     visitorData.id = pendingRequestId || (Date.now().toString() + (visitorData.selectedSpot ? `-${visitorData.selectedSpot.label}` : ''));
     visitorData.ratePerHour = getRate();
 
@@ -1001,23 +1004,29 @@ function startExitPolling() {
             const res = await fetch('/api/visitors');
             const all = await res.json();
 
-            // Find ourselves by ID in the list to see if we've been marked as exited
-            const me = all.find(v => v.id === visitorData.id && v.exitTime);
+            // Find ourselves by ID in the list
+            const me = all.find(v => v.id === visitorData.id);
 
             if (me) {
-                console.log('[EXIT] Admin processed exit for:', me.licensePlate);
-                clearInterval(exitPollInterval);
-                exitPollInterval = null;
+                // 1. Sync live metadata (if they extended via WhatsApp)
+                if (me.estimatedHours) visitorData.estimatedHours = me.estimatedHours;
+                if (me.ratePerHour) visitorData.ratePerHour = me.ratePerHour;
 
-                // Update local visitorData with server values
-                visitorData.exitTime = me.exitTime;
-                visitorData.totalCharge = me.totalCharge;
-                visitorData.id = me.id;
+                // 2. Check if we've been marked as exited
+                if (me.exitTime) {
+                    console.log('[EXIT] Admin processed exit for:', me.licensePlate);
+                    clearInterval(exitPollInterval);
+                    exitPollInterval = null;
 
-                handleAutoExit(true); // true means came from server
+                    visitorData.exitTime = me.exitTime;
+                    visitorData.totalCharge = me.totalCharge;
+                    visitorData.id = me.id;
+
+                    handleAutoExit(true); // true means came from server
+                }
             }
         } catch (err) {
-            console.warn('Exit poll error:', err);
+            console.warn('Exit/Metadata poll error:', err);
         }
     }, 5000); // Check every 5 seconds
 }
@@ -1040,9 +1049,27 @@ function updateTimer() {
 
     // Calculate charge
     const exactHours = diffMs / 3600000;
-    visitorData.totalCharge = Math.max(exactHours * visitorData.ratePerHour, 0);
+    const baseCharge = Math.max(exactHours * visitorData.ratePerHour, 0);
 
-    document.getElementById('current-charge').textContent = '₹' + visitorData.totalCharge.toFixed(2);
+    // Calculate fine if exceeded estimated time
+    const estimatedMs = (visitorData.estimatedHours || 4) * 3600000;
+    const FINE_AMOUNT = parseInt(localStorage.getItem('smartpark_fine_amount')) || 50;
+    const fine = diffMs > estimatedMs ? FINE_AMOUNT : 0;
+
+    visitorData.totalCharge = baseCharge + fine;
+
+    const chargeEl = document.getElementById('current-charge');
+    const timeEl = document.getElementById('time-elapsed');
+
+    if (fine > 0) {
+        chargeEl.textContent = `₹${visitorData.totalCharge.toFixed(2)} (incl. ₹${FINE_AMOUNT} fine)`;
+        chargeEl.style.color = '#ef4444';
+        timeEl.style.color = '#ef4444';
+    } else {
+        chargeEl.textContent = '₹' + visitorData.totalCharge.toFixed(2);
+        chargeEl.style.color = 'var(--text-main)';
+        timeEl.style.color = 'var(--accent)';
+    }
 }
 
 // 5. Automatic Exit on plate detection
