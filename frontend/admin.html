@@ -277,42 +277,7 @@
         </div>
     </div>
 
-    <!-- ===== REGISTER SCREEN ===== -->
-    <div id="screen-register" class="login-wrapper auth-screen">
-        <div class="login-card">
-            <div class="admin-logo">
-                <img src="logo.png" alt="SmartParkk Logo" style="width: 64px; height: 64px;">
-            </div>
-            <div class="header">
-                <h1>Admin <span class="highlight">Registration</span></h1>
-                <p>Create a new admin account</p>
-            </div>
-            <form id="register-form">
-                <div class="input-group">
-                    <label for="reg-username">Username</label>
-                    <input type="text" id="reg-username" required placeholder="Create username">
-                </div>
-                <div class="input-group">
-                    <label for="reg-password">Password</label>
-                    <div class="password-input-wrapper">
-                        <input type="password" id="reg-password" required placeholder="Create password">
-                        <button type="button" class="password-toggle-btn" id="reg-password-toggle"
-                            title="Show/hide password">
-                            👁️
-                        </button>
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label for="reg-phone">Phone Number</label>
-                    <input type="text" id="reg-phone" required placeholder="Enter 10-digit phone number">
-                </div>
-                <div class="status-msg" id="register-msg"
-                    style="display: none; margin-bottom: 15px; min-height: 0; font-size: 14px;"></div>
-                <button type="submit" class="btn btn-primary">Create Account</button>
-                <button type="button" class="btn btn-text" id="register-back-login">Back to Login</button>
-            </form>
-        </div>
-    </div>
+    
 
     <!-- ===== FORGOT PASSWORD SCREEN ===== -->
     <div id="screen-forgot" class="login-wrapper auth-screen">
@@ -409,16 +374,6 @@
                         <rect x="3" y="14" width="7" height="7"></rect>
                     </svg>
                     Dashboard
-                </a>
-                <a href="#" class="nav-item" id="tab-gate" style="position:relative;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                    Gate Control
-                    <span id="gate-tab-badge"
-                        style="display:none; position:absolute; top:6px; right:8px; background:#ef4444; color:white; font-size:10px; font-weight:700; border-radius:50%; width:16px; height:16px; align-items:center; justify-content:center;"></span>
                 </a>
                 <a href="#" class="nav-item" id="tab-residents">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
