@@ -1405,14 +1405,6 @@ async function startDashboardScan() {
     const statusMsg = document.getElementById('dash-cctv-status');
     const overlay = document.getElementById('detected-plate-dashboard');
 
-    const entryWrap = document.getElementById('dash-match-entry-result');
-    const entryText = document.getElementById('dash-match-entry-text');
-    const entryBtn = document.getElementById('btn-dash-open-entry');
-
-    const exitWrap = document.getElementById('dash-match-exit-result');
-    const exitPlateText = document.getElementById('dash-match-exit-plate');
-    const exitChargeText = document.getElementById('dash-match-exit-charge');
-
     if (!adminTesseractWorker) {
         statusMsg.textContent = "OCR engine loading...";
         setTimeout(startDashboardScan, 2000);
@@ -1437,65 +1429,50 @@ async function startDashboardScan() {
             const cleanText = normaliseAdminOCR(tRes.data.text);
 
             if (cleanText.length >= 4) {
-                overlay.textContent = cleanText;
+                overlay.textContent = "Validating...";
                 overlay.style.display = 'block';
-                statusMsg.textContent = `Processing Plate: ${cleanText}...`;
+                statusMsg.textContent = "Validating...";
 
                 // 1. Check for EXIT FIRST (if plate is already parked)
                 let matchedVisitor = null;
                 try {
                     const visRes = await fetch('/api/visitors');
                     const visitors = await visRes.json();
-                    matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate), cleanText));
+                    matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate || ''), cleanText));
                 } catch (e) { }
 
                 if (matchedVisitor) {
-                    statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
-
+                    statusMsg.textContent = "✅ Validated! Processing exit fees...";
                     const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
                     const entryMs = new Date(matchedVisitor.entryTime).getTime();
                     const diffMs = Math.max(Date.now() - entryMs, 0);
                     const diffHrs = diffMs / 3600000;
-                    const FINE_AMOUNT = getFineAmount();
-                    const totalCharge = (diffHrs * parseFloat(savedRate)) + (diffMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
+                    const totalCharge = (diffHrs * parseFloat(savedRate)) + (diffMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? getFineAmount() : 0);
 
                     await fetch('/api/visitors/update', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            id: matchedVisitor.id,
-                            exitTime: new Date().toISOString(),
-                            totalCharge: totalCharge
-                        })
+                        body: JSON.stringify({ id: matchedVisitor.id, exitTime: new Date().toISOString(), totalCharge: totalCharge })
                     });
 
-                    statusMsg.textContent = `🚗 Vehicle exit processed: ${cleanText}`;
-                    exitPlateText.textContent = `Plate: ${cleanText}`;
-                    exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
-                    exitWrap.style.display = 'block';
-
+                    statusMsg.textContent = `🚗 Vehicle exit processed (Charge: ₹${totalCharge.toFixed(2)})`;
                     setTimeout(() => {
-                        exitWrap.style.display = 'none';
                         overlay.style.display = 'none';
-                        statusMsg.textContent = `Resuming scan...`;
                         startDashboardScan();
                     }, 6000);
                     break;
                 }
 
-                // 2. Check for ENTRY (if plate is in approved visitor requests)
+                // 2. Check for ENTRY
                 let matchedRequest = null;
                 try {
                     const reqRes = await fetch('/api/visitor-requests');
                     const requests = await reqRes.json();
-                    matchedRequest = (requests || []).find(r => r.status === 'approved' && adminFuzzyMatch(normaliseAdminOCR(r.licensePlate), cleanText));
+                    matchedRequest = (requests || []).find(r => r.status === 'approved' && adminFuzzyMatch(normaliseAdminOCR(r.licensePlate || ''), cleanText));
                 } catch (e) { }
 
                 if (matchedRequest) {
-                    statusMsg.textContent = `✅ Plate matched! Triggering admin notification...`;
-                    entryText.textContent = `${matchedRequest.visitorName} visiting ${matchedRequest.visitingFlat}`;
-
-                    // Trigger gate notification immediately when plate is validated
+                    statusMsg.textContent = "✅ Validated! Sending notification...";
                     const triggerRes = await fetch('/api/gate-notifications/trigger', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1504,46 +1481,18 @@ async function startDashboardScan() {
                             visitorName: matchedRequest.visitorName,
                             licensePlate: matchedRequest.licensePlate,
                             visitingFlat: matchedRequest.visitingFlat,
-                            visitorPhone: matchedRequest.visitorPhone,
-                            isManual: false
+                            visitorPhone: matchedRequest.visitorPhone
                         })
                     });
                     const triggerData = await triggerRes.json();
-
                     if (triggerData.success) {
-                        statusMsg.textContent = `✅ Notification sent to admin!`;
-                        entryWrap.style.display = 'block';
-
-                        entryBtn.onclick = async () => {
-                            // Dismiss the notification to open the gate
-                            await fetch('/api/gate-notifications/dismiss', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: triggerData.notificationId })
-                            });
-
-                            // Also add visitor to the visitors table with entry time
-                            const entryRes = await fetch('/api/visitors', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    id: matchedRequest.id,
-                                    name: matchedRequest.visitorName,
-                                    phone: matchedRequest.visitorPhone,
-                                    licensePlate: matchedRequest.licensePlate,
-                                    visitingFlat: matchedRequest.visitingFlat,
-                                    entryTime: new Date().toISOString()
-                                })
-                            });
-
-                            entryWrap.style.display = 'none';
+                        statusMsg.textContent = `✅ Notification sent! Use floating alert to open gate.`;
+                        setTimeout(() => {
                             overlay.style.display = 'none';
-                            statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Entry recorded!`;
-                            adminGateIsScanning = false;
-                            setTimeout(startDashboardScan, 3000);
-                        };
+                            startDashboardScan();
+                        }, 4000);
                     } else {
-                        statusMsg.textContent = `⚠️ Failed to notify admin: ${triggerData.message || 'Unknown error'}`;
+                        statusMsg.textContent = `⚠️ Failed: ${triggerData.message || 'Error'}`;
                         setTimeout(startDashboardScan, 3000);
                     }
                     break;
@@ -1552,7 +1501,7 @@ async function startDashboardScan() {
                 overlay.style.display = 'none';
                 statusMsg.textContent = "Scanning for plates...";
             }
-        } catch (err) { console.warn(err); }
+        } catch (err) { console.warn('[OCR Error]', err); }
     }
 }
 
