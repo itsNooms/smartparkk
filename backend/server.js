@@ -425,7 +425,7 @@ waClient.on('message', async (msg) => {
 
     const { error: updateErr } = await supabase
         .from('visitors')
-        .update({ estimated_hours: newEstimatedHours, extension_notified_at: null })
+        .update({ estimated_hours: newEstimatedHours, extension_notified_at: '{}' })
         .eq('id', visitor.id);
 
     if (updateErr) {
@@ -714,7 +714,7 @@ app.post('/api/visitors/extend', async (req, res) => {
 
     const { error: updateErr } = await supabase
         .from('visitors')
-        .update({ estimated_hours: newEstimatedHours, extension_notified_at: null })
+        .update({ estimated_hours: newEstimatedHours, extension_notified_at: '{}' })
         .eq('id', visitor.id);
 
     if (updateErr) return res.status(500).json({ success: false, message: updateErr.message });
@@ -1208,7 +1208,7 @@ app.listen(PORT, async () => {
 // PARKING EXPIRY NOTIFICATION JOB
 // ============================================
 async function checkParkingExpiryNotifications() {
-    if (!waReady) return; // Only run when WhatsApp is connected
+    if (!waReady) return;
 
     try {
         const { data: visitors, error } = await supabase
@@ -1219,7 +1219,8 @@ async function checkParkingExpiryNotifications() {
         if (error || !visitors || visitors.length === 0) return;
 
         const now = Date.now();
-        const TEN_MIN_MS = 10 * 60 * 1000;
+        const THIRTY_MIN_MS = 30 * 60 * 1000;
+        const FIVE_MIN_MS = 5 * 60 * 1000;
         const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
         for (const visitor of visitors) {
@@ -1227,54 +1228,75 @@ async function checkParkingExpiryNotifications() {
 
             const entryMs = new Date(visitor.entry_time).getTime();
             const ageMs = now - entryMs;
-            if (ageMs > ONE_DAY_MS) continue; // Stale record
+            if (ageMs > ONE_DAY_MS) continue; // Stale
 
             const estimatedHours = visitor.estimated_hours || 4;
             const estimatedEndMs = entryMs + estimatedHours * 3600000;
             const timeLeft = estimatedEndMs - now;
 
-            // Only notify in the 10-minute warning window
-            if (timeLeft > TEN_MIN_MS || timeLeft < 0) continue;
-
-            // Skip if already notified for this estimated end time
-            if (visitor.extension_notified_at) {
-                // Allow re-notify only if they extended (new end is >30min beyond last notif)
-                const notifMs = new Date(visitor.extension_notified_at).getTime();
-                const newEnd = entryMs + (visitor.estimated_hours * 3600000);
-                if (newEnd - notifMs <= TEN_MIN_MS) continue; // Not extended yet
+            // Define stages
+            let stage = null;
+            if (timeLeft <= 0) {
+                stage = 'expired';
+            } else if (timeLeft <= FIVE_MIN_MS) {
+                stage = 'urgent';
+            } else if (timeLeft <= THIRTY_MIN_MS) {
+                stage = 'warning';
             }
+
+            if (!stage) continue;
+
+            // Check tracker for this specific stage and estimated_hours
+            const lastNotif = visitor.extension_notified_at ? JSON.parse(visitor.extension_notified_at) : {};
+            const stageKey = `${stage}_${estimatedHours}`;
+
+            if (lastNotif[stageKey]) continue; // Already sent this stage for this duration
 
             const cleanPhone = visitor.phone.replace(/\D/g, '').slice(-10);
             const chatId = `91${cleanPhone}@c.us`;
-            const minutesLeft = Math.max(1, Math.round(timeLeft / 60000));
+            const minutesLeft = Math.max(0, Math.round(timeLeft / 60000));
             const currentCharge = ((ageMs / 3600000) * (visitor.rate_per_hour || 5)).toFixed(2);
+            const rate = visitor.rate_per_hour || 5;
 
-            const message =
-                `⏰ *SmartParkk – Parking Reminder*\n\n` +
-                `Hi ${visitor.name}! Your estimated parking time ends in *${minutesLeft} minutes*.\n\n` +
-                `💰 Current charge: *₹${currentCharge}*\n\n` +
-                `🔄 *Want to extend? Reply with:*\n` +
-                `• *EXTEND 1* → +1 hour (₹${visitor.rate_per_hour || 5})\n` +
-                `• *EXTEND 2* → +2 hours (₹${(visitor.rate_per_hour || 5) * 2})\n` +
-                `• *EXTEND 3* → +3 hours (₹${(visitor.rate_per_hour || 5) * 3})\n\n` +
-                `⚠️ *Important:* If you stay beyond your estimated time, a *₹50 fine* will be added to your charges!\n\n` +
-                `If you are leaving soon, you can just ignore this message.\n\n` +
-                `🚗 Plate: ${visitor.license_plate}`;
+            let message = '';
+            if (stage === 'warning' || stage === 'urgent') {
+                const timeStr = stage === 'warning' ? `*${minutesLeft} minutes*` : `ONLY *${minutesLeft} minutes*`;
+                message =
+                    `⏰ *SmartParkk – Parking Reminder*\n\n` +
+                    `Hi ${visitor.name}! Your estimated parking duration ends in ${timeStr}.\n\n` +
+                    `💰 Current base charge: *₹${currentCharge}*\n\n` +
+                    `🔄 *Want to avoid a fine? Reply with:*\n` +
+                    `• *EXTEND 1* → +1 hour (₹${rate})\n` +
+                    `• *EXTEND 2* → +2 hours (₹${rate * 2})\n\n` +
+                    `⚠️ *Fine Warning:* If you don't extend or leave in time, a *₹50 fine* will be added automatically.\n\n` +
+                    `🚗 Plate: ${visitor.license_plate}`;
+            } else if (stage === 'expired') {
+                message =
+                    `🚨 *SmartParkk – Parking EXPIRED*\n\n` +
+                    `Hi ${visitor.name}, your estimated duration of ${estimatedHours}h has completed.\n\n` +
+                    `⚠️ *Fine Applied:* A ₹50 fine has been added to your session as per policy.\n\n` +
+                    `✅ *You can still extend to remove the fine!* Reply with:\n` +
+                    `• *EXTEND 1* → +1 hour and *CANCEL FINE*\n\n` +
+                    `If you are at the gate, please proceed to exit.\n` +
+                    `🚗 Plate: ${visitor.license_plate}`;
+            }
 
             try {
                 await waClient.sendMessage(chatId, message);
-                console.log(`[EXPIRY NOTIF] Sent to +91${cleanPhone} (${visitor.name}, ${minutesLeft}min left)`);
+                console.log(`[EXPIRY NOTIF] Stage: ${stage} sent to +91${cleanPhone} (${visitor.name})`);
 
+                // Update tracker
+                const updatedTracker = { ...lastNotif, [stageKey]: true, last_sent_at: new Date().toISOString() };
                 await supabase
                     .from('visitors')
-                    .update({ extension_notified_at: new Date().toISOString() })
+                    .update({ extension_notified_at: JSON.stringify(updatedTracker) })
                     .eq('id', visitor.id);
             } catch (sendErr) {
-                console.error(`[EXPIRY NOTIF] Failed for ${cleanPhone}:`, sendErr.message);
+                console.error(`[EXPIRY NOTIF] Error for ${cleanPhone}:`, sendErr.message);
             }
         }
     } catch (err) {
-        console.error('[EXPIRY CHECK] Error:', err.message);
+        console.error('[EXPIRY CHECK] Global Error:', err.message);
     }
 }
 
