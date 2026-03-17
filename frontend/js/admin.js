@@ -118,14 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Navigation links
-    document.getElementById('goto-register-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        showAuthScreen('screen-register');
-    });
 
-    document.getElementById('register-back-login').addEventListener('click', () => {
-        showAuthScreen('screen-login');
-    });
     document.getElementById('goto-forgot-link').addEventListener('click', (e) => {
         e.preventDefault();
         showAuthScreen('screen-forgot');
@@ -275,60 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showAuthScreen('screen-login');
     });
 
-    // ============================================
-    // REGISTRATION FLOW
-    // ============================================
-    const registerForm = document.getElementById('register-form');
-    const registerMsg = document.getElementById('register-msg');
 
-    registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const username = document.getElementById('reg-username').value.trim();
-        const password = document.getElementById('reg-password').value;
-        const phone = document.getElementById('reg-phone').value.trim();
-
-        if (phone.length < 10) {
-            registerMsg.textContent = 'Please enter a valid 10-digit phone number.';
-            registerMsg.style.color = 'var(--danger)';
-            registerMsg.style.display = 'block';
-            return;
-        }
-
-        const btn = registerForm.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        btn.textContent = 'Creating account...';
-
-        try {
-            const res = await fetch('/api/admin/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, phone })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                registerMsg.textContent = 'Registration successful! Redirecting to login...';
-                registerMsg.style.color = 'var(--success)';
-                registerMsg.style.display = 'block';
-
-                setTimeout(() => {
-                    registerForm.reset();
-                    registerMsg.style.display = 'none';
-                    showAuthScreen('screen-login');
-                }, 2000);
-            } else {
-                registerMsg.textContent = data.message || 'Registration failed.';
-                registerMsg.style.color = 'var(--danger)';
-                registerMsg.style.display = 'block';
-            }
-        } catch (err) {
-            alert('Server error');
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Create Account';
-        }
-    });
 
     // Password Toggle Logic
     function setupPasswordToggle(inputId, toggleId) {
@@ -351,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPasswordToggle('password', 'password-toggle');
     setupPasswordToggle('new-password', 'new-password-toggle');
     setupPasswordToggle('confirm-password', 'confirm-password-toggle');
-    setupPasswordToggle('reg-password', 'reg-password-toggle');
+
 
     // ============================================
     // DASHBOARD LOGIC
@@ -388,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadTableData();
         loadResidentsData();
-        startGateMonitors();
+        startDashboardCamera(); // Start camera + scan on dashboard
         refreshInterval = setInterval(() => {
             loadTableData();
             loadResidentsData();
@@ -399,21 +339,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Tab Navigation
         const tabDashboard = document.getElementById('tab-dashboard');
-        const tabGate = document.getElementById('tab-gate');
         const tabResidents = document.getElementById('tab-residents');
         const tabHistory = document.getElementById('tab-history');
         const tabParkingLot = document.getElementById('tab-parking-lot');
         const tabBlocked = document.getElementById('tab-blocked');
 
         const viewDashboard = document.getElementById('dashboard-view');
-        const viewGate = document.getElementById('gate-view');
         const viewResidents = document.getElementById('residents-view');
         const viewHistory = document.getElementById('history-view');
         const viewParkingLot = document.getElementById('parking-lot-view');
         const viewBlocked = document.getElementById('blocked-view');
 
-        const allTabs = [tabDashboard, tabGate, tabResidents, tabHistory, tabParkingLot, tabBlocked];
-        const allViews = [viewDashboard, viewGate, viewResidents, viewHistory, viewParkingLot, viewBlocked];
+        const allTabs = [tabDashboard, tabResidents, tabHistory, tabParkingLot, tabBlocked];
+        const allViews = [viewDashboard, viewResidents, viewHistory, viewParkingLot, viewBlocked];
 
         function switchTab(activeTab, activeView) {
             allTabs.forEach(t => t.classList.remove('active'));
@@ -428,15 +366,9 @@ document.addEventListener('DOMContentLoaded', () => {
             stopAdminCamera();
             switchTab(tabDashboard, viewDashboard);
             startDashboardCamera();
-            startGateMonitors();
         });
 
-        tabGate.addEventListener('click', (e) => {
-            e.preventDefault();
-            stopAdminCamera();
-            switchTab(tabGate, viewGate);
-            startGateMonitors();
-        });
+
 
         tabResidents.addEventListener('click', (e) => {
             e.preventDefault();
@@ -976,10 +908,6 @@ async function pollGateNotifications() {
         const activeNotifCount = validNotifs.length;
         updateGateBadge(activeNotifCount);
 
-        // ── Also update the Gate Control panel + sidebar tab badge ───────────
-        renderGateView(notifications || []);
-        updateGateTabBadge(activeNotifCount);
-
     } catch (err) {
         // Silently fail — don't spam console on network hiccups
     } finally {
@@ -987,205 +915,9 @@ async function pollGateNotifications() {
     }
 }
 
-// ── Render the Gate Control dedicated view ───────────────────────────────────
-function renderGateView(notifications) {
-    const container = document.getElementById('gate-cards-container');
-    const emptyEl = document.getElementById('gate-view-empty');
-    if (!container || !emptyEl) return;
 
-    if (!notifications || notifications.length === 0) {
-        container.innerHTML = '';
-        emptyEl.style.display = 'flex';
-        return;
-    }
 
-    emptyEl.style.display = 'none';
 
-    const existingIds = new Set(
-        Array.from(container.querySelectorAll('.gv-card')).map(el => el.dataset.id)
-    );
-    const incomingIds = new Set(notifications.map(n => String(n.id)));
-
-    // Remove stale or processed cards
-    existingIds.forEach(id => {
-        if (!incomingIds.has(id) || _processedGateNotifs.has(id)) {
-            const el = container.querySelector(`.gv-card[data-id="${id}"]`);
-            if (el) { el.style.animation = 'gateDismiss 0.3s ease forwards'; setTimeout(() => el.remove(), 320); }
-        }
-    });
-
-    // Add new cards
-    notifications.forEach(notif => {
-        const idStr = String(notif.id);
-        if (existingIds.has(idStr)) return;
-        if (_processedGateNotifs.has(idStr)) return; // Skip if admin just handled it
-
-        const timeStr = new Date(notif.createdAt).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-        const isApproval = notif.type === 'approved' || !notif.type;
-        const isDenied = notif.type === 'denied';
-        const isBlocked = notif.type === 'blocked';
-
-        let badgeTitle = 'Resident Approved — Gate Request';
-        let badgeColor = '#10b981';
-        let badgeIcon = '🚦';
-        let bgGradient = 'linear-gradient(135deg,#0f1f30 0%,#0a1628 100%)';
-        let borderShadow = 'rgba(16,185,129,0.35)';
-
-        if (isDenied) {
-            badgeTitle = 'Resident Denied — Entry Rejected';
-            badgeColor = '#ef4444';
-            badgeIcon = '🚫';
-            borderShadow = 'rgba(239,68,68,0.35)';
-        } else if (isBlocked) {
-            badgeTitle = 'Resident Action — Visitor Blocked';
-            badgeColor = '#f59e0b';
-            badgeIcon = '🛑';
-            borderShadow = 'rgba(245,158,11,0.35)';
-        }
-
-        const card = document.createElement('div');
-        card.className = 'gv-card';
-        card.dataset.id = idStr;
-
-        card.style.cssText = [
-            `background:${bgGradient}`,
-            `border:1.5px solid ${borderShadow}`,
-            'border-radius:16px',
-            'padding:24px 28px',
-            'display:flex',
-            'align-items:center',
-            'justify-content:space-between',
-            'gap:24px',
-            'flex-wrap:wrap',
-            'animation:gateSlideIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both',
-            'position:relative',
-            'overflow:hidden'
-        ].join(';');
-
-        card.innerHTML = `
-            <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:${badgeColor};border-radius:16px 0 0 16px;"></div>
-            <div style="flex:1;min-width:200px;padding-left:8px;">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                    <div style="width:40px;height:40px;border-radius:10px;background:${badgeColor}26;border:1px solid ${badgeColor}4D;display:flex;align-items:center;justify-content:center;font-size:20px;">${badgeIcon}</div>
-                    <div>
-                        <div style="font-size:11px;font-weight:700;color:${badgeColor};letter-spacing:0.8px;text-transform:uppercase;">${badgeTitle}</div>
-                        <div style="font-size:12px;color:rgba(148,163,184,0.7);margin-top:2px;">${timeStr}</div>
-                    </div>
-                </div>
-                <div style="font-size:20px;font-weight:700;color:#f8fafc;margin-bottom:12px;">${escapeHtml(notif.visitorName)}</div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                    <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:5px 10px;font-size:13px;color:#94a3b8;">🏠 <strong style="color:#f1f5f9;">${escapeHtml(notif.visitingFlat || 'N/A')}</strong></span>
-                    <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:5px 10px;font-size:13px;color:#94a3b8;">🚗 <strong style="color:#f1f5f9;">${escapeHtml(notif.licensePlate || 'N/A')}</strong></span>
-                    <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:5px 10px;font-size:13px;color:#94a3b8;">📞 <strong style="color:#f1f5f9;">${escapeHtml(notif.visitorPhone || '—')}</strong></span>
-                </div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:10px;min-width:160px;">
-                ${isApproval ? `
-                <button onclick="openGateFromView('${notif.id}',this)"
-                    style="padding:14px 24px;border:none;border-radius:12px;background:linear-gradient(135deg,#10b981,#059669);color:white;font-size:15px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.18s ease;white-space:nowrap;box-shadow:0 4px 20px rgba(16,185,129,0.3);"
-                    onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(16,185,129,0.45)';"
-                    onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(16,185,129,0.3);';"
-                >🔓 Open Gate</button>
-                ` : ''}
-                <button onclick="dismissFromView('${notif.id}')"
-                    style="padding:10px 24px;border:1px solid rgba(255,255,255,0.12);border-radius:12px;background:rgba(255,255,255,0.04);color:#64748b;font-size:13px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;transition:all 0.18s ease; width: 100%;"
-                    onmouseover="this.style.background='rgba(255,255,255,0.09)';this.style.color='#94a3b8';"
-                    onmouseout="this.style.background='rgba(255,255,255,0.04)';this.style.color='#64748b';"
-                >Dismiss</button>
-            </div>
-        `;
-        container.appendChild(card);
-    });
-}
-
-function _removeGvCard(notifId) {
-    const card = document.querySelector(`.gv-card[data-id="${notifId}"]`);
-    if (card) {
-        card.style.animation = 'gateDismiss 0.3s ease forwards';
-        setTimeout(() => {
-            card.remove();
-            if (!document.querySelector('.gv-card')) {
-                const em = document.getElementById('gate-view-empty');
-                if (em) em.style.display = 'flex';
-            }
-        }, 320);
-    }
-}
-
-function updateGateTabBadge(count) {
-    const badge = document.getElementById('gate-tab-badge');
-    if (!badge) return;
-    if (count > 0) { badge.textContent = count; badge.style.display = 'inline-flex'; }
-    else { badge.style.display = 'none'; }
-}
-
-async function openGateFromView(notifId, btnEl) {
-    const idStr = String(notifId);
-    let originalText = '';
-    if (btnEl) {
-        originalText = btnEl.innerHTML;
-        btnEl.disabled = true;
-        btnEl.innerHTML = 'Opening...';
-    }
-
-    try {
-        const res = await fetch('/api/gate-notifications/dismiss', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: notifId })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            _processedGateNotifs.add(idStr);
-            _shownGateNotifs.delete(idStr);
-            saveNotifState();
-
-            if (btnEl) {
-                btnEl.innerHTML = '✅ Gate Opened!';
-                btnEl.style.background = 'linear-gradient(135deg,#059669,#047857)';
-            }
-            // Animate out after a brief "opened" flash
-            setTimeout(() => {
-                removeGateCard(notifId);
-                _removeGvCard(notifId);
-            }, 1200);
-        } else {
-            throw new Error(data.message || 'Server failed to open gate');
-        }
-    } catch (e) {
-        console.error('[GATE] Open error:', e);
-        alert('Failed to open gate: ' + e.message);
-        if (btnEl) {
-            btnEl.disabled = false;
-            btnEl.innerHTML = originalText;
-        }
-    }
-}
-
-async function dismissFromView(notifId) {
-    const idStr = String(notifId);
-    try {
-        const res = await fetch('/api/gate-notifications/dismiss', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: notifId })
-        });
-        const data = await res.json();
-        if (data.success) {
-            _processedGateNotifs.add(idStr);
-            _shownGateNotifs.delete(idStr);
-            saveNotifState();
-            removeGateCard(notifId);
-            _removeGvCard(notifId);
-        } else {
-            console.error('[GATE] Dismiss failed:', data.message);
-        }
-    } catch (e) {
-        console.error('[GATE] Dismiss error:', e);
-    }
-}
 
 async function openGate(notifId, btnEl) {
     const idStr = String(notifId);
@@ -1722,9 +1454,10 @@ async function startDashboardScan() {
 
                     const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
                     const entryMs = new Date(matchedVisitor.entryTime).getTime();
-                    const diffHrs = (Date.now() - entryMs) / 3600000;
+                    const diffMs = Math.max(Date.now() - entryMs, 0);
+                    const diffHrs = diffMs / 3600000;
                     const FINE_AMOUNT = getFineAmount();
-                    const totalCharge = (Math.max(diffHrs * parseFloat(savedRate), 0)) + (Date.now() - entryMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
+                    const totalCharge = (diffHrs * parseFloat(savedRate)) + (diffMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
 
                     await fetch('/api/visitors/update', {
                         method: 'POST',
@@ -1760,7 +1493,7 @@ async function startDashboardScan() {
 
                 if (matchedRequest) {
                     statusMsg.textContent = `✅ Plate matched! Triggering admin notification...`;
-                    entryText.textContent = `${matchedRequest.visitorName} visiting ${matchedRequest.visitingFlatId}`;
+                    entryText.textContent = `${matchedRequest.visitorName} visiting ${matchedRequest.visitingFlat}`;
 
                     // Trigger gate notification immediately when plate is validated
                     const triggerRes = await fetch('/api/gate-notifications/trigger', {
@@ -1770,6 +1503,8 @@ async function startDashboardScan() {
                             requestId: matchedRequest.id,
                             visitorName: matchedRequest.visitorName,
                             licensePlate: matchedRequest.licensePlate,
+                            visitingFlat: matchedRequest.visitingFlat,
+                            visitorPhone: matchedRequest.visitorPhone,
                             isManual: false
                         })
                     });
@@ -1792,11 +1527,11 @@ async function startDashboardScan() {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
-                                    id: Date.now().toString(),
+                                    id: matchedRequest.id,
                                     name: matchedRequest.visitorName,
                                     phone: matchedRequest.visitorPhone,
                                     licensePlate: matchedRequest.licensePlate,
-                                    visitingFlat: matchedRequest.visitingFlatId,
+                                    visitingFlat: matchedRequest.visitingFlat,
                                     entryTime: new Date().toISOString()
                                 })
                             });
@@ -1821,203 +1556,9 @@ async function startDashboardScan() {
     }
 }
 
-function stopAdminCamera() {
-    Object.keys(_activeStreams).forEach(key => {
-        if (_activeStreams[key]) {
-            _activeStreams[key].getTracks().forEach(t => t.stop());
-            delete _activeStreams[key];
-        }
-    });
-    adminGateIsScanning = false;
-}
-
-// Gate Control Monitors (CCTV)
-async function startGateMonitors() {
-    const gateCctvVid = document.getElementById('gate-cctv-video');
-    const dashCctvVid = document.getElementById('dash-cctv-video');
-    const gateStatus = document.getElementById('gate-cctv-status');
-    const dashStatus = document.getElementById('dash-cctv-status');
 
 
-    if (!_activeStreams['monitor'] && (gateCctvVid || dashCctvVid)) {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            _activeStreams['monitor'] = stream;
-            if (gateCctvVid) gateCctvVid.srcObject = stream;
-            if (dashCctvVid) dashCctvVid.srcObject = stream;
 
-            if (gateStatus) gateStatus.textContent = "Live Gate Stream";
-            if (dashStatus) dashStatus.textContent = "Live";
-        } catch (e) {
-            if (gateStatus) gateStatus.textContent = "Camera Error";
-            if (dashStatus) dashStatus.textContent = "Error";
-        }
-    } else if (_activeStreams['monitor']) {
-        if (gateCctvVid) gateCctvVid.srcObject = _activeStreams['monitor'];
-        if (dashCctvVid) dashCctvVid.srcObject = _activeStreams['monitor'];
-    }
-
-    // Start Exit feed
-
-}
-
-// (Camera remains running in the background when changing tabs)
-
-async function adminGateContinuousScan() {
-    const video = document.getElementById('gate-camera-feed');
-    const canvas = document.getElementById('gate-snapshot-canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const statusMsg = document.getElementById('gate-camera-status');
-    const overlay = document.getElementById('detected-plate-admin-gate');
-
-    const entryWrap = document.getElementById('gate-match-entry-result');
-    const entryText = document.getElementById('gate-match-entry-text');
-    const entryBtn = document.getElementById('btn-gate-open-entry');
-
-    const exitWrap = document.getElementById('gate-match-exit-result');
-    const exitPlateText = document.getElementById('gate-match-exit-plate');
-    const exitChargeText = document.getElementById('gate-match-exit-charge');
-
-    if (!adminTesseractWorker) {
-        statusMsg.textContent = "OCR engine missing or loading...";
-        setTimeout(adminGateContinuousScan, 2000);
-        return;
-    }
-
-    adminGateIsScanning = true;
-    statusMsg.textContent = "Auto-monitoring entrance & exit...";
-
-    while (adminGateIsScanning) {
-        await new Promise(r => setTimeout(r, 800));
-        if (!adminGateIsScanning) break;
-        if (video.readyState !== video.HAVE_ENOUGH_DATA) continue;
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        try {
-            const processed = preprocessAdminPlate(canvas);
-            const tRes = await adminTesseractWorker.recognize(processed);
-            const cleanText = normaliseAdminOCR(tRes.data.text);
-
-            if (cleanText.length >= 4) {
-                overlay.textContent = cleanText;
-                overlay.style.display = 'block';
-                statusMsg.textContent = `Scanning plate: ${cleanText}...`;
-
-                // 1. Check for ENTRY
-                let matchedRequest = null;
-                try {
-                    const reqRes = await fetch('/api/visitor-requests');
-                    const requests = await reqRes.json();
-                    matchedRequest = (requests || []).find(r => r.status === 'approved' && adminFuzzyMatch(normaliseAdminOCR(r.licensePlate), cleanText));
-                } catch (e) { }
-
-                if (matchedRequest) {
-                    statusMsg.textContent = `✅ Plate matched! Triggering admin notification...`;
-                    entryText.textContent = `${matchedRequest.visitorName} visiting ${matchedRequest.visitingFlatId}`;
-
-                    // Trigger gate notification immediately when plate is validated
-                    const triggerRes = await fetch('/api/gate-notifications/trigger', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            requestId: matchedRequest.id,
-                            visitorName: matchedRequest.visitorName,
-                            licensePlate: matchedRequest.licensePlate,
-                            isManual: false
-                        })
-                    });
-                    const triggerData = await triggerRes.json();
-
-                    if (triggerData.success) {
-                        statusMsg.textContent = `✅ Notification sent to admin!`;
-                        entryWrap.style.display = 'block';
-
-                        entryBtn.onclick = async () => {
-                            // Dismiss the notification to open the gate
-                            await fetch('/api/gate-notifications/dismiss', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: triggerData.notificationId })
-                            });
-
-                            // Also add visitor to the visitors table with entry time
-                            const entryRes = await fetch('/api/visitors', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    id: Date.now().toString(),
-                                    name: matchedRequest.visitorName,
-                                    phone: matchedRequest.visitorPhone,
-                                    licensePlate: matchedRequest.licensePlate,
-                                    visitingFlat: matchedRequest.visitingFlatId,
-                                    entryTime: new Date().toISOString()
-                                })
-                            });
-
-                            entryWrap.style.display = 'none';
-                            overlay.style.display = 'none';
-                            statusMsg.textContent = `🔓 Gate opened for ${cleanText}. Entry recorded!`;
-                            adminGateIsScanning = false;
-                            setTimeout(adminGateContinuousScan, 3000);
-                        };
-                    } else {
-                        statusMsg.textContent = `⚠️ Failed to notify admin: ${triggerData.message || 'Unknown error'}`;
-                        setTimeout(adminGateContinuousScan, 3000);
-                    }
-                    break;
-                }
-
-                // 2. Check for EXIT
-                let matchedVisitor = null;
-                try {
-                    const visRes = await fetch('/api/visitors');
-                    const visitors = await visRes.json();
-                    matchedVisitor = (visitors || []).find(v => !v.exitTime && adminFuzzyMatch(normaliseAdminOCR(v.licensePlate), cleanText));
-                } catch (e) { }
-
-                if (matchedVisitor) {
-                    adminGateIsScanning = false;
-                    statusMsg.textContent = `✅ Plate matched! Calculating exit charges...`;
-
-                    const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
-                    const entryMs = new Date(matchedVisitor.entryTime).getTime();
-                    const diffHrs = (Date.now() - entryMs) / 3600000;
-                    const FINE_AMOUNT = getFineAmount();
-                    const totalCharge = (Math.max(diffHrs * parseFloat(savedRate), 0)) + (Date.now() - entryMs > (matchedVisitor.estimatedHours || 4) * 3600000 ? FINE_AMOUNT : 0);
-
-                    await fetch('/api/visitors/update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            id: matchedVisitor.id,
-                            exitTime: new Date().toISOString(),
-                            totalCharge: totalCharge
-                        })
-                    });
-
-                    statusMsg.textContent = `🚗 Vehicle exit processed: ${cleanText}`;
-                    exitPlateText.textContent = `Plate: ${cleanText}`;
-                    exitChargeText.textContent = `Charge: ₹${totalCharge.toFixed(2)}`;
-                    exitWrap.style.display = 'block';
-
-                    setTimeout(() => {
-                        exitWrap.style.display = 'none';
-                        overlay.style.display = 'none';
-                        statusMsg.textContent = `Resuming...`;
-                        adminGateContinuousScan();
-                    }, 6000);
-                    break;
-                }
-            } else {
-                overlay.style.display = 'none';
-                statusMsg.textContent = "Auto-monitoring entrance & exit...";
-            }
-        } catch (err) { console.warn(err); }
-    }
-}
 
 // ============================================
 // SETTINGS EDITING
