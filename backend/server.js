@@ -589,6 +589,47 @@ app.post('/api/residents/update', async (req, res) => {
     res.json({ success: true, resident: data[0] });
 });
 
+// Delete a resident account (requires password confirmation)
+app.delete('/api/residents/delete', async (req, res) => {
+    const { flatInput, password } = req.body;
+    if (!flatInput || !password) {
+        return res.status(400).json({ success: false, message: 'flatInput and password are required' });
+    }
+
+    try {
+        // Verify password first
+        const { data: resident, error: fetchErr } = await supabase
+            .from('residents')
+            .select('id, password')
+            .eq('flat_input', flatInput)
+            .single();
+
+        if (fetchErr || !resident) {
+            return res.status(404).json({ success: false, message: 'Account not found.' });
+        }
+
+        if (resident.password !== password) {
+            return res.status(401).json({ success: false, message: 'Incorrect password.' });
+        }
+
+        // Delete blocked_visitors entries for this resident
+        await supabase.from('blocked_visitors').delete().eq('resident_flat_id', flatInput);
+
+        // Delete the resident
+        const { error: deleteErr } = await supabase
+            .from('residents')
+            .delete()
+            .eq('flat_input', flatInput);
+
+        if (deleteErr) return res.status(500).json({ success: false, message: deleteErr.message });
+
+        console.log(`[ACCOUNT] Resident ${flatInput} deleted their account.`);
+        res.json({ success: true, message: 'Account deleted successfully.' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 app.get('/api/visitors', async (req, res) => {
     const { data, error } = await supabase.from('visitors').select('*');
     if (error) {
