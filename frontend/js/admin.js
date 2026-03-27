@@ -902,6 +902,52 @@ async function pollGateNotifications() {
             `;
 
             stack.appendChild(card);
+
+            // ── Auto-dismiss after 3 seconds ──────────────────────────────
+            // Add a countdown progress bar at the bottom of the card
+            const progressBar = document.createElement('div');
+            progressBar.style.cssText = `
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                height: 3px;
+                width: 100%;
+                border-radius: 0 0 16px 16px;
+                background: rgba(255,255,255,0.18);
+                overflow: hidden;
+            `;
+            const progressFill = document.createElement('div');
+            progressFill.style.cssText = `
+                height: 100%;
+                width: 100%;
+                border-radius: inherit;
+                background: rgba(255,255,255,0.5);
+                transform-origin: left;
+                animation: gateProgressBar 3s linear forwards;
+            `;
+            progressBar.appendChild(progressFill);
+            card.style.position = 'relative';
+            card.style.overflow = 'hidden';
+            card.appendChild(progressBar);
+
+            // Inject the keyframe once
+            if (!document.getElementById('gate-progress-style')) {
+                const styleEl = document.createElement('style');
+                styleEl.id = 'gate-progress-style';
+                styleEl.textContent = `
+                    @keyframes gateProgressBar {
+                        from { transform: scaleX(1); }
+                        to   { transform: scaleX(0); }
+                    }
+                `;
+                document.head.appendChild(styleEl);
+            }
+
+            setTimeout(() => {
+                dismissGateAlert(notif.id, null);
+            }, 3000);
+            // ── End auto-dismiss ───────────────────────────────────────────
+
         });
 
         const validNotifs = (notifications || []).filter(n => !_processedGateNotifs.has(String(n.id)));
