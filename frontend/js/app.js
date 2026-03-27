@@ -588,7 +588,7 @@ function hideRegisterError() {
 // =============================================
 // AUTO-SUBMIT: fire when all fields + spot ready
 // =============================================
-let _autoSubmitTimer = null;
+
 
 function checkAutoSubmit() {
     const name = (document.getElementById('name')?.value || '').trim();
@@ -603,21 +603,11 @@ function checkAutoSubmit() {
     const allFilled = name && flat && phone && plate && spot;
 
     if (allFilled) {
-        // Show the "ready" state on the button
+        // Show the "ready" state on the button — but do NOT auto-fire
         btn.classList.add('btn-ready');
-        btn.textContent = '✓ All set — Generating OTP…';
-        btn.disabled = false; // ensure clickable
-
-        // Auto-fire after a short pause so visitor can see the state
-        clearTimeout(_autoSubmitTimer);
-        _autoSubmitTimer = setTimeout(() => {
-            if (visitorData.selectedSpot) {   // re-check spot still set
-                registerForm.requestSubmit();
-            }
-        }, 600);
+        btn.textContent = '✓ All set — Tap to Generate OTP';
+        btn.disabled = false;
     } else {
-        // Revert button to normal if something gets cleared
-        clearTimeout(_autoSubmitTimer);
         btn.classList.remove('btn-ready');
         btn.textContent = 'Generate OTP';
         btn.disabled = false;
@@ -1264,8 +1254,11 @@ function _onSpotPicked(spotEl, label, type, emoji, grid) {
     // Also update the vl-your-spot-label if active screen is visible
     _updateActiveParkingSpot();
 
-    // Trigger auto-submit check — might fire OTP generation automatically
+    // Update the Generate OTP button state (visual only — does NOT auto-fire)
     checkAutoSubmit();
+
+    // Auto-close the modal after a short delay so visitor sees their selection
+    setTimeout(() => _closeParkingModalProgrammatic(), 900);
 }
 
 function _renderSpotSelectionBanner(label, emoji) {
@@ -1373,10 +1366,15 @@ function _renderActiveLotMap(chosenSpotId, wrapper) {
     });
 }
 
+// Close when clicking the backdrop
 function closeParkingModal(e) {
-    // Close only when clicking the backdrop (not the modal itself)
     if (e && e.target !== document.getElementById('pm-overlay')) return;
+    _closeParkingModalProgrammatic();
+}
+
+// Programmatic close (no event needed)
+function _closeParkingModalProgrammatic() {
     const overlay = document.getElementById('pm-overlay');
-    overlay.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
     document.body.style.overflow = '';
 }
