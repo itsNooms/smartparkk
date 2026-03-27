@@ -285,9 +285,51 @@
                 </div>
 
                 <button type="button" class="btn btn-danger" onclick="logoutResident()">Logout</button>
+                <button type="button" class="btn" id="delete-account-btn"
+                    onclick="openDeleteAccountModal()"
+                    style="background: transparent; border: 1px solid rgba(239,68,68,0.35); color: rgba(239,68,68,0.7); margin-top: 6px; font-size: 13px; padding: 10px; transition: all 0.2s;">
+                    🗑️ Delete Account
+                </button>
             </div>
         </section>
     </div>
+
+    <!-- Delete Account Modal -->
+    <div id="delete-account-overlay"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); z-index:2000; justify-content:center; align-items:center; padding:20px;">
+        <div id="delete-account-modal"
+            style="background:#1e293b; border:1px solid rgba(239,68,68,0.25); border-radius:20px; padding:28px; max-width:360px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.5); animation: modalPop 0.25s cubic-bezier(0.34,1.56,0.64,1) both;">
+            <!-- Icon -->
+            <div style="text-align:center; margin-bottom:20px;">
+                <div style="width:60px; height:60px; border-radius:50%; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.25); display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 14px;">🗑️</div>
+                <h3 style="font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:6px;">Delete Account?</h3>
+                <p style="font-size:13px; color:#94a3b8; line-height:1.55;">This will <strong style="color:#ef4444;">permanently delete</strong> your account, vehicles, and all blocked visitors. This action cannot be undone.</p>
+            </div>
+            <!-- Password Confirm -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:13px; font-weight:500; color:#94a3b8; display:block; margin-bottom:8px;">Confirm your password</label>
+                <div class="password-input-group">
+                    <input type="password" id="delete-account-password" placeholder="Enter your password"
+                        style="width:100%; background:rgba(15,23,42,0.7); border:1px solid rgba(239,68,68,0.3); border-radius:10px; padding:12px 40px 12px 14px; color:#f8fafc; font-size:14px; font-family:'Inter',sans-serif; outline:none;">
+                    <button type="button" class="password-toggle-btn"
+                        onclick="togglePasswordVisibility('delete-account-password', this)">👁️</button>
+                </div>
+                <p id="delete-account-error" style="display:none; color:#ef4444; font-size:12px; margin-top:6px; font-weight:500;"></p>
+            </div>
+            <!-- Actions -->
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeDeleteAccountModal()"
+                    style="flex:1; padding:13px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; background:transparent; color:#94a3b8; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">
+                    Cancel
+                </button>
+                <button id="delete-account-confirm" onclick="confirmDeleteAccount()"
+                    style="flex:1; padding:13px; border:none; border-radius:10px; background:var(--danger); color:white; font-size:14px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s;">
+                    Delete Forever
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Block Confirmation Modal -->
     <div id="block-modal-overlay"
