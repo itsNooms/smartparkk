@@ -704,7 +704,9 @@ async function loadTableData() {
 
             const entryTime = new Date(entry.entryTime).toLocaleString();
             const exitTime = entry.exitTime ? new Date(entry.exitTime).toLocaleString() : '-';
-            const charge = entry.totalCharge ? `₹${entry.totalCharge.toFixed(2)}` : (isCompleted ? '₹0.00' : 'Accruing...');
+        const charge = entry.visitingFlat === 'RESIDENT'
+                ? `<span style="color:#38bdf8; font-weight:700; font-size:12px; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.25); padding:3px 8px; border-radius:6px;">🏠 Resident</span>`
+                : entry.totalCharge ? `₹${entry.totalCharge.toFixed(2)}` : (isCompleted ? '₹0.00' : 'Accruing...');
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -1506,6 +1508,72 @@ async function startDashboardScan() {
                         overlay.style.display = 'none';
                         startDashboardScan();
                     }, 6000);
+                    break;
+                }
+
+                // 1b. Check if plate belongs to a RESIDENT (free entry/exit)
+                let matchedResident = null;
+                try {
+                    const resRes = await fetch('/api/residents');
+                    const residents = await resRes.json();
+                    matchedResident = (residents || []).find(r => {
+                        if (!r.carPlate || r.carPlate === 'N/A') return false;
+                        // Support multiple plates stored as comma-separated
+                        return r.carPlate.split(',').some(p =>
+                            adminFuzzyMatch(normaliseAdminOCR(p.trim()), cleanText)
+                        );
+                    });
+                } catch (e) { }
+
+                if (matchedResident) {
+                    // Check if this resident vehicle already has an active entry (= exit scan)
+                    let activeResidentEntry = null;
+                    try {
+                        const visRes2 = await fetch('/api/visitors');
+                        const visitors2 = await visRes2.json();
+                        activeResidentEntry = (visitors2 || []).find(v =>
+                            !v.exitTime &&
+                            v.visitingFlat === 'RESIDENT' &&
+                            adminFuzzyMatch(normaliseAdminOCR(v.licensePlate || ''), cleanText)
+                        );
+                    } catch (e) { }
+
+                    if (activeResidentEntry) {
+                        // EXIT — close their entry at zero cost
+                        await fetch('/api/visitors/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: activeResidentEntry.id, exitTime: new Date().toISOString(), totalCharge: 0 })
+                        });
+                        overlay.textContent = matchedResident.carPlate;
+                        statusMsg.textContent = `🏠 Resident exit logged — ${matchedResident.name} (${matchedResident.flatInput}). No charge.`;
+                    } else {
+                        // ENTRY — create a free log entry
+                        const resEntryId = 'RES-' + Date.now();
+                        await fetch('/api/visitors', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id: resEntryId,
+                                name: matchedResident.name,
+                                phone: matchedResident.phone,
+                                licensePlate: matchedResident.carPlate.split(',')[0].trim(),
+                                visitingFlat: 'RESIDENT',
+                                entryTime: new Date().toISOString(),
+                                exitTime: null,
+                                ratePerHour: 0,
+                                totalCharge: 0,
+                                estimatedHours: 12
+                            })
+                        });
+                        overlay.textContent = matchedResident.carPlate;
+                        statusMsg.textContent = `🏠 Resident entry logged — ${matchedResident.name} (${matchedResident.flatInput}). No charge.`;
+                    }
+
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        startDashboardScan();
+                    }, 5000);
                     break;
                 }
 
