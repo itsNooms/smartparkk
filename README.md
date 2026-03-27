@@ -50,7 +50,6 @@ SmartParkk is a modern parking management system designed for apartment complexe
 - **Responsive Design** - Works on desktop, tablet, mobile
 - **Service Worker** - PWA support for resident portal
 - **Tesseract.js** - Client-side OCR for plate recognition
-- **Web Audio API** - Alert notifications
 
 ### Backend
 - **Node.js & Express** - Lightweight server
