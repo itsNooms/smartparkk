@@ -425,7 +425,7 @@ waClient.on('message', async (msg) => {
 
     const { error: updateErr } = await supabase
         .from('visitors')
-        .update({ estimated_hours: newEstimatedHours, extension_notified_at: '{}' })
+        .update({ estimated_hours: newEstimatedHours, extension_notified_at: {} })
         .eq('id', visitor.id);
 
     if (updateErr) {
@@ -755,7 +755,7 @@ app.post('/api/visitors/extend', async (req, res) => {
 
     const { error: updateErr } = await supabase
         .from('visitors')
-        .update({ estimated_hours: newEstimatedHours, extension_notified_at: '{}' })
+        .update({ estimated_hours: newEstimatedHours, extension_notified_at: {} })
         .eq('id', visitor.id);
 
     if (updateErr) return res.status(500).json({ success: false, message: updateErr.message });
