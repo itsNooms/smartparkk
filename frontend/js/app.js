@@ -620,6 +620,83 @@ function checkAutoSubmit() {
     if (el) el.addEventListener('input', checkAutoSubmit);
 });
 
+// =============================================
+// FLAT ID LIVE VALIDATION
+// =============================================
+let _validFlatIds = null; // cached list of known flat IDs
+
+async function _loadFlatIds() {
+    if (_validFlatIds) return _validFlatIds;
+    try {
+        const res = await fetch('/api/residents');
+        const residents = await res.json();
+        const ids = new Set();
+        residents.forEach(r => {
+            if (r.baseFlatId) ids.add(r.baseFlatId.toUpperCase());
+            if (r.flatInput) {
+                const fi = r.flatInput.toUpperCase();
+                ids.add(fi);
+                ids.add(fi.replace(/T$/, '')); // strip trailing T suffix variant
+            }
+        });
+        _validFlatIds = [...ids].filter(Boolean);
+        console.log('[FlatValidation] Loaded flat IDs:', _validFlatIds);
+    } catch (e) {
+        console.warn('[FlatValidation] Failed to load flat IDs:', e);
+        _validFlatIds = null;
+    }
+    return _validFlatIds;
+}
+
+(function initFlatValidation() {
+    const flatInput = document.getElementById('visiting-flat');
+    if (!flatInput) return;
+
+    // Create an inline error element right below the input
+    const wrapper = flatInput.closest('.input-group');
+    let flatError = document.createElement('div');
+    flatError.id = 'flat-id-error';
+    flatError.style.cssText = `
+        color: #ef4444;
+        font-size: 12.5px;
+        font-weight: 500;
+        margin-top: 5px;
+        display: none;
+        align-items: center;
+        gap: 5px;
+    `;
+    flatError.innerHTML = '⚠️ Invalid Flat ID — please enter a registered flat.';
+    if (wrapper) wrapper.appendChild(flatError);
+
+    let debounceTimer = null;
+    flatInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const val = flatInput.value.trim().toUpperCase();
+        if (!val) { flatError.style.display = 'none'; return; }
+
+        // Debounce 400ms so we don't spam the API on every keystroke
+        debounceTimer = setTimeout(async () => {
+            const ids = await _loadFlatIds();
+            if (!ids) return; // couldn't load — skip validation
+            if (ids.includes(val)) {
+                flatError.style.display = 'none';
+                flatInput.style.borderColor = '';
+            } else {
+                flatError.style.display = 'flex';
+                flatInput.style.borderColor = '#ef4444';
+            }
+        }, 400);
+    });
+
+    // Clear error when field is cleared
+    flatInput.addEventListener('blur', () => {
+        if (!flatInput.value.trim()) {
+            flatError.style.display = 'none';
+            flatInput.style.borderColor = '';
+        }
+    });
+})();
+
 // 1. Registration Submit
 registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -628,7 +705,7 @@ registerForm.addEventListener('submit', async (e) => {
     // ── SPOT REQUIRED CHECK ───────────────────────
     if (!visitorData.selectedSpot) {
         showRegisterError(
-            'Please select a parking spot first — use the <strong>Normal</strong> or <strong>Access ♿</strong> buttons at the top.'
+            'Please select a parking spot first — use the <strong>Normal 🅿️</strong> or <strong>Access ♿</strong> buttons at the top.'
         );
         // Shake both top-bar buttons to point the visitor's attention there
         ['btn-normal-spots', 'btn-accessibility'].forEach(id => {
@@ -644,6 +721,21 @@ registerForm.addEventListener('submit', async (e) => {
         if (wrapper) {
             wrapper.classList.add('spot-required-error');
             setTimeout(() => wrapper.classList.remove('spot-required-error'), 2500);
+        }
+        return;
+    }
+    // ─────────────────────────────────────────────
+
+    // ── FLAT ID VALIDATION ────────────────────────
+    const enteredFlat = (document.getElementById('visiting-flat').value || '').trim().toUpperCase();
+    const flatIds = await _loadFlatIds();
+    if (flatIds && !flatIds.includes(enteredFlat)) {
+        showRegisterError('Invalid Flat ID — please enter a registered flat number.');
+        // Highlight the field
+        const flatInput = document.getElementById('visiting-flat');
+        if (flatInput) {
+            flatInput.style.borderColor = '#ef4444';
+            flatInput.focus();
         }
         return;
     }
@@ -1257,8 +1349,8 @@ function _onSpotPicked(spotEl, label, type, emoji, grid) {
     // Update the Generate OTP button state (visual only — does NOT auto-fire)
     checkAutoSubmit();
 
-    // Auto-close the modal after a short delay so visitor sees their selection
-    setTimeout(() => _closeParkingModalProgrammatic(), 900);
+    // Close the modal immediately after selection
+    _closeParkingModalProgrammatic();
 }
 
 function _renderSpotSelectionBanner(label, emoji) {
