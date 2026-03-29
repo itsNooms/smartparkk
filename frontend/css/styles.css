@@ -669,7 +669,7 @@ input:focus {
     transform: scale(1.15);
 }
 
-/* Wheelchair button ─ cyan/teal accent */
+/* Accessibility / Wheelchair button ─ cyan/teal accent */
 #btn-accessibility:hover {
     border-color: var(--highlight);
     color: var(--highlight);
@@ -681,6 +681,28 @@ input:focus {
 
 #btn-accessibility:hover svg {
     transform: scale(1.15);
+}
+
+/* Normal Spots button ─ emerald/green accent */
+#btn-normal-spots:hover {
+    border-color: var(--success);
+    color: var(--success);
+    background: rgba(16, 185, 129, 0.12);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18),
+        0 6px 20px rgba(16, 185, 129, 0.2);
+    transform: translateY(-3px);
+}
+
+#btn-normal-spots:hover svg {
+    transform: scale(1.15);
+}
+
+/* Active states for both buttons */
+#btn-normal-spots.active {
+    border-color: var(--success);
+    color: var(--success);
+    background: rgba(16, 185, 129, 0.15);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
 }
 
 /* Active / toggled state for the accessibility button */
