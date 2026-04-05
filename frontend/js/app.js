@@ -478,7 +478,7 @@ async function continuousScan(videoId, callback, timeoutMs) {
                 isScanning = false;
                 overlay.style.display = 'block';
                 overlay.textContent = visitorData.licensePlate;
-                statusMsg.textContent = "✅ Plate Matched! Validating...";
+                statusMsg.textContent = "✅ Plate Scanning! Validating...";
 
                 setTimeout(() => {
                     container.classList.remove('scanning');
@@ -588,7 +588,7 @@ function hideRegisterError() {
 // =============================================
 // AUTO-SUBMIT: fire when all fields + spot ready
 // =============================================
-let _autoSubmitTimer = null;
+
 
 function checkAutoSubmit() {
     const name = (document.getElementById('name')?.value || '').trim();
@@ -603,21 +603,11 @@ function checkAutoSubmit() {
     const allFilled = name && flat && phone && plate && spot;
 
     if (allFilled) {
-        // Show the "ready" state on the button
+        // Show the "ready" state on the button — but do NOT auto-fire
         btn.classList.add('btn-ready');
-        btn.textContent = '✓ All set — Generating OTP…';
-        btn.disabled = false; // ensure clickable
-
-        // Auto-fire after a short pause so visitor can see the state
-        clearTimeout(_autoSubmitTimer);
-        _autoSubmitTimer = setTimeout(() => {
-            if (visitorData.selectedSpot) {   // re-check spot still set
-                registerForm.requestSubmit();
-            }
-        }, 600);
+        btn.textContent = '✓ All set — Tap to Generate OTP';
+        btn.disabled = false;
     } else {
-        // Revert button to normal if something gets cleared
-        clearTimeout(_autoSubmitTimer);
         btn.classList.remove('btn-ready');
         btn.textContent = 'Generate OTP';
         btn.disabled = false;
@@ -630,6 +620,83 @@ function checkAutoSubmit() {
     if (el) el.addEventListener('input', checkAutoSubmit);
 });
 
+// =============================================
+// FLAT ID LIVE VALIDATION
+// =============================================
+let _validFlatIds = null; // cached list of known flat IDs
+
+async function _loadFlatIds() {
+    if (_validFlatIds) return _validFlatIds;
+    try {
+        const res = await fetch('/api/residents');
+        const residents = await res.json();
+        const ids = new Set();
+        residents.forEach(r => {
+            if (r.baseFlatId) ids.add(r.baseFlatId.toUpperCase());
+            if (r.flatInput) {
+                const fi = r.flatInput.toUpperCase();
+                ids.add(fi);
+                ids.add(fi.replace(/T$/, '')); // strip trailing T suffix variant
+            }
+        });
+        _validFlatIds = [...ids].filter(Boolean);
+        console.log('[FlatValidation] Loaded flat IDs:', _validFlatIds);
+    } catch (e) {
+        console.warn('[FlatValidation] Failed to load flat IDs:', e);
+        _validFlatIds = null;
+    }
+    return _validFlatIds;
+}
+
+(function initFlatValidation() {
+    const flatInput = document.getElementById('visiting-flat');
+    if (!flatInput) return;
+
+    // Create an inline error element right below the input
+    const wrapper = flatInput.closest('.input-group');
+    let flatError = document.createElement('div');
+    flatError.id = 'flat-id-error';
+    flatError.style.cssText = `
+        color: #ef4444;
+        font-size: 12.5px;
+        font-weight: 500;
+        margin-top: 5px;
+        display: none;
+        align-items: center;
+        gap: 5px;
+    `;
+    flatError.innerHTML = '⚠️ Invalid Flat ID — please enter a registered flat.';
+    if (wrapper) wrapper.appendChild(flatError);
+
+    let debounceTimer = null;
+    flatInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const val = flatInput.value.trim().toUpperCase();
+        if (!val) { flatError.style.display = 'none'; return; }
+
+        // Debounce 400ms so we don't spam the API on every keystroke
+        debounceTimer = setTimeout(async () => {
+            const ids = await _loadFlatIds();
+            if (!ids) return; // couldn't load — skip validation
+            if (ids.includes(val)) {
+                flatError.style.display = 'none';
+                flatInput.style.borderColor = '';
+            } else {
+                flatError.style.display = 'flex';
+                flatInput.style.borderColor = '#ef4444';
+            }
+        }, 400);
+    });
+
+    // Clear error when field is cleared
+    flatInput.addEventListener('blur', () => {
+        if (!flatInput.value.trim()) {
+            flatError.style.display = 'none';
+            flatInput.style.borderColor = '';
+        }
+    });
+})();
+
 // 1. Registration Submit
 registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -638,7 +705,7 @@ registerForm.addEventListener('submit', async (e) => {
     // ── SPOT REQUIRED CHECK ───────────────────────
     if (!visitorData.selectedSpot) {
         showRegisterError(
-            'Please select a parking spot first — use the <strong>Normal</strong> or <strong>Access ♿</strong> buttons at the top.'
+            'Please select a parking spot first — use the <strong>Normal 🅿️</strong> or <strong>Access ♿</strong> buttons at the top.'
         );
         // Shake both top-bar buttons to point the visitor's attention there
         ['btn-normal-spots', 'btn-accessibility'].forEach(id => {
@@ -654,6 +721,21 @@ registerForm.addEventListener('submit', async (e) => {
         if (wrapper) {
             wrapper.classList.add('spot-required-error');
             setTimeout(() => wrapper.classList.remove('spot-required-error'), 2500);
+        }
+        return;
+    }
+    // ─────────────────────────────────────────────
+
+    // ── FLAT ID VALIDATION ────────────────────────
+    const enteredFlat = (document.getElementById('visiting-flat').value || '').trim().toUpperCase();
+    const flatIds = await _loadFlatIds();
+    if (flatIds && !flatIds.includes(enteredFlat)) {
+        showRegisterError('Invalid Flat ID — please enter a registered flat number.');
+        // Highlight the field
+        const flatInput = document.getElementById('visiting-flat');
+        if (flatInput) {
+            flatInput.style.borderColor = '#ef4444';
+            flatInput.focus();
         }
         return;
     }
@@ -737,7 +819,7 @@ registerForm.addEventListener('submit', async (e) => {
     }
     // ─────────────────────────────────────────────
 
-    btn.textContent = 'Sending OTP...';
+    btn.textContent = 'Sending OTP via WhatsApp...';
 
     try {
         const res = await fetch('/api/send-otp', {
@@ -750,19 +832,17 @@ registerForm.addEventListener('submit', async (e) => {
         if (data.success) {
             displayPhone.textContent = `+91 ${visitorData.phone}`;
             const mockNote = document.querySelector('.mock-note');
-            if (data.demo) {
-                mockNote.innerHTML = `⚠️ <b>WhatsApp not connected.</b><br>Using Demo OTP: <span style="font-size: 1.2em; color: var(--highlight);">${data.otp}</span>`;
-            } else {
+            if (mockNote) {
                 mockNote.innerHTML = '✅ OTP sent to your WhatsApp!';
+                mockNote.style.display = 'block';
             }
-            mockNote.style.display = 'block';
             showScreen('screen-otp');
             setTimeout(() => otpInputs[0].focus(), 100);
         } else {
-            alert(data.message || 'Failed to send OTP');
+            showRegisterError(data.message || 'Failed to send OTP. Please try again.');
         }
     } catch (err) {
-        alert('Server not reachable. Make sure server.js is running.');
+        showRegisterError('Server not reachable. Make sure the server is running.');
         console.error(err);
     }
 
@@ -772,6 +852,7 @@ registerForm.addEventListener('submit', async (e) => {
 });
 
 // OTP Input Logic
+
 otpInputs.forEach((input, index) => {
     input.addEventListener('keyup', (e) => {
         if (e.key >= 0 && e.key <= 9) {
@@ -818,7 +899,9 @@ otpForm.addEventListener('submit', async (e) => {
                         visitorName: visitorData.name,
                         visitorPhone: visitorData.phone,
                         licensePlate: visitorData.licensePlate,
-                        visitingFlat: visitorData.visitingFlat
+                        visitingFlat: visitorData.visitingFlat,
+                        selectedSpot: visitorData.selectedSpot ? visitorData.selectedSpot.label : '',
+                        estimatedHours: visitorData.estimatedHours
                     })
                 });
                 const reqData = await reqRes.json();
@@ -968,8 +1051,9 @@ function pollAdminGateAction(notifId) {
 
 function startParking() {
     visitorData.entryTime = new Date();
-    const spotSuffix = visitorData.selectedSpot ? `-${visitorData.selectedSpot.label}` : '';
-    visitorData.id = Date.now().toString() + spotSuffix;
+    // Use the requestId as the ID to preserve the spot-suffix (e.g. 17107...-A05)
+    // This allows the Admin Parking Lot to correctly place the vehicle in its spot.
+    visitorData.id = pendingRequestId || (Date.now().toString() + (visitorData.selectedSpot ? `-${visitorData.selectedSpot.label}` : ''));
     visitorData.ratePerHour = getRate();
 
     // Save to local storage array for the admin dashboard
@@ -987,12 +1071,51 @@ function startParking() {
     // Start Timer
     updateTimer();
     parkingTimer = setInterval(updateTimer, 1000);
+
+    // Start polling for exit status (admin processing exit)
+    startExitPolling();
+}
+
+let exitPollInterval = null;
+function startExitPolling() {
+    if (exitPollInterval) clearInterval(exitPollInterval);
+
+    exitPollInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/visitors');
+            const all = await res.json();
+
+            // Find ourselves by ID in the list
+            const me = all.find(v => v.id === visitorData.id);
+
+            if (me) {
+                // 1. Sync live metadata (if they extended via WhatsApp)
+                if (me.estimatedHours) visitorData.estimatedHours = me.estimatedHours;
+                if (me.ratePerHour) visitorData.ratePerHour = me.ratePerHour;
+
+                // 2. Check if we've been marked as exited
+                if (me.exitTime) {
+                    console.log('[EXIT] Admin processed exit for:', me.licensePlate);
+                    clearInterval(exitPollInterval);
+                    exitPollInterval = null;
+
+                    visitorData.exitTime = me.exitTime;
+                    visitorData.totalCharge = me.totalCharge;
+                    visitorData.id = me.id;
+
+                    handleAutoExit(true); // true means came from server
+                }
+            }
+        } catch (err) {
+            console.warn('Exit/Metadata poll error:', err);
+        }
+    }, 5000); // Check every 5 seconds
 }
 
 function updateTimer() {
     const now = Date.now();
     const entryMs = new Date(visitorData.entryTime).getTime();
-    const diffMs = now - entryMs;
+    const diffMs = Math.max(now - entryMs, 0);
 
     const diffHrs = Math.floor(diffMs / 3600000);
     const diffMins = Math.floor((diffMs % 3600000) / 60000);
@@ -1007,17 +1130,39 @@ function updateTimer() {
 
     // Calculate charge
     const exactHours = diffMs / 3600000;
-    visitorData.totalCharge = Math.max(exactHours * visitorData.ratePerHour, 0);
+    const baseCharge = Math.max(exactHours * visitorData.ratePerHour, 0);
 
-    document.getElementById('current-charge').textContent = '₹' + visitorData.totalCharge.toFixed(2);
+    // Calculate fine if exceeded estimated time
+    const estimatedMs = (visitorData.estimatedHours || 4) * 3600000;
+    const FINE_AMOUNT = parseInt(localStorage.getItem('smartpark_fine_amount')) || 50;
+    const fine = diffMs > estimatedMs ? FINE_AMOUNT : 0;
+
+    visitorData.totalCharge = baseCharge + fine;
+
+    const chargeEl = document.getElementById('current-charge');
+    const timeEl = document.getElementById('time-elapsed');
+
+    if (fine > 0) {
+        chargeEl.textContent = `₹${visitorData.totalCharge.toFixed(2)} (incl. ₹${FINE_AMOUNT} fine)`;
+        chargeEl.style.color = '#ef4444';
+        timeEl.style.color = '#ef4444';
+    } else {
+        chargeEl.textContent = '₹' + visitorData.totalCharge.toFixed(2);
+        chargeEl.style.color = 'var(--text-main)';
+        timeEl.style.color = 'var(--accent)';
+    }
 }
 
 // 5. Automatic Exit on plate detection
-function handleAutoExit() {
-    clearInterval(parkingTimer);
+function handleAutoExit(fromServer = false) {
+    if (parkingTimer) clearInterval(parkingTimer);
+    if (exitPollInterval) clearInterval(exitPollInterval);
     stopCamera();
 
-    visitorData.exitTime = new Date();
+    if (!fromServer) {
+        visitorData.exitTime = new Date();
+    }
+
     updateFinalReceipt();
     showScreen('screen-receipt');
 }
@@ -1026,7 +1171,7 @@ function updateFinalReceipt() {
     // Ensure dates are proper Date objects
     const entry = new Date(visitorData.entryTime);
     const exit = new Date(visitorData.exitTime);
-    const diffMs = exit.getTime() - entry.getTime();
+    const diffMs = Math.max(exit.getTime() - entry.getTime(), 0);
 
     console.log('Entry:', entry.toISOString(), 'Exit:', exit.toISOString(), 'Diff ms:', diffMs);
 
@@ -1063,6 +1208,8 @@ function updateFinalReceipt() {
 }
 
 function resetApp() {
+    if (parkingTimer) clearInterval(parkingTimer);
+    if (exitPollInterval) clearInterval(exitPollInterval);
     window.location.reload();
 }
 
@@ -1198,8 +1345,11 @@ function _onSpotPicked(spotEl, label, type, emoji, grid) {
     // Also update the vl-your-spot-label if active screen is visible
     _updateActiveParkingSpot();
 
-    // Trigger auto-submit check — might fire OTP generation automatically
+    // Update the Generate OTP button state (visual only — does NOT auto-fire)
     checkAutoSubmit();
+
+    // Close the modal immediately after selection
+    _closeParkingModalProgrammatic();
 }
 
 function _renderSpotSelectionBanner(label, emoji) {
@@ -1307,10 +1457,15 @@ function _renderActiveLotMap(chosenSpotId, wrapper) {
     });
 }
 
+// Close when clicking the backdrop
 function closeParkingModal(e) {
-    // Close only when clicking the backdrop (not the modal itself)
     if (e && e.target !== document.getElementById('pm-overlay')) return;
+    _closeParkingModalProgrammatic();
+}
+
+// Programmatic close (no event needed)
+function _closeParkingModalProgrammatic() {
     const overlay = document.getElementById('pm-overlay');
-    overlay.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
     document.body.style.overflow = '';
 }

@@ -4,63 +4,45 @@ const cors = require('cors');
 const path = require('path');
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
-const QRCode = require('qrcode');
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
 const dns = require('dns');
 const fs = require('fs');
 const webpush = require('web-push');
 
 // ============================================
-// WHATSAPP SESSION STORE (Supabase-based)
+// META WHATSAPP CLOUD API
 // ============================================
-class SupabaseSessionStore {
-    constructor(supabase) {
-        this.supabase = supabase;
-        this.sessionKey = 'whatsapp-session-main';
-    }
+// Requires env vars: WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID
+// Set these in Railway → Variables
+const WA_TOKEN = process.env.WHATSAPP_TOKEN || '';
+const WA_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+const waReady = !!(WA_TOKEN && WA_PHONE_ID);
 
-    async read() {
-        try {
-            const { data, error } = await this.supabase
-                .from('whatsapp_sessions')
-                .select('session_data')
-                .eq('key', this.sessionKey)
-                .single();
-
-            if (error || !data) {
-                console.log('📱 No WhatsApp session found in database');
-                return null;
-            }
-
-            console.log('📱 WhatsApp session loaded from database');
-            return data.session_data;
-        } catch (e) {
-            console.error('Error reading session from database:', e.message);
-            return null;
-        }
-    }
-
-    async write(data) {
-        try {
-            const { error } = await this.supabase
-                .from('whatsapp_sessions')
-                .upsert({
-                    key: this.sessionKey,
-                    session_data: data,
-                    updated_at: new Date().toISOString()
-                });
-
-            if (error) {
-                console.error('Error saving session to database:', error.message);
-            } else {
-                console.log('📱 WhatsApp session saved to database');
-            }
-        } catch (e) {
-            console.error('Error saving session:', e.message);
-        }
-    }
+if (waReady) {
+    console.log('  ✓  WhatsApp Cloud API configured — OTPs will be sent via WhatsApp.');
+} else {
+    console.warn('  ⚠  WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set — WhatsApp OTP disabled.');
 }
+
+async function sendWhatsAppMessage(phone, message) {
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const fullPhone = `91${cleanPhone}`;
+    const url = `https://graph.facebook.com/v18.0/${WA_PHONE_ID}/messages`;
+
+    await axios.post(url, {
+        messaging_product: 'whatsapp',
+        to: fullPhone,
+        type: 'text',
+        text: { body: message }
+    }, {
+        headers: {
+            'Authorization': `Bearer ${WA_TOKEN}`,
+            'Content-Type': 'application/json'
+        },
+        timeout: 15000
+    });
+}
+
+
 
 // ============================================
 // WEB PUSH CONFIG
@@ -177,53 +159,9 @@ app.get('/api/health', async (req, res) => {
     res.json(health);
 });
 
-// QR Code Endpoint
-app.get('/api/qr', async (req, res) => {
-    if (waReady) {
-        return res.send(`
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; text-align: center;">
-                <h1 style="color: #25D366;">✓ WhatsApp is Connected!</h1>
-                <p>You can now close this tab and start using the app.</p>
-                <button onclick="window.close()" style="padding: 10px 20px; background: #25D366; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;">Close Tab</button>
-            </div>
-        `);
-    }
-    if (!latestQR) {
-        return res.send(`
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; text-align: center;">
-                <h1>Initializing WhatsApp...</h1>
-                <p>The server is starting the WhatsApp client. This page will refresh automatically in 5 seconds.</p>
-                <div style="width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #25D366; border-radius: 50%; animate: spin 2s linear infinite;"></div>
-                <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
-                <script>setTimeout(()=>location.reload(), 5000)</script>
-            </div>
-        `);
-    }
-
-    try {
-        const qrImage = await QRCode.toDataURL(latestQR);
-        res.send(`
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; text-align: center; background: #f0f2f5;">
-                <h1 style="color: #25D366;">Scan for WhatsApp Connection</h1>
-                <p>Open WhatsApp on your phone &rarr; Linked Devices &rarr; Link a Device</p>
-                <div style="background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
-                    <img src="${qrImage}" style="width: 300px; height: 300px;" />
-                </div>
-                <p style="margin-top: 20px; color: #666;">This page will automatically refresh once connected.</p>
-                <script>
-                    setInterval(async () => {
-                        try {
-                            const res = await fetch('/api/health');
-                            const data = await res.json();
-                            if (data.env.wa_ready) location.reload();
-                        } catch(e) {}
-                    }, 3000);
-                </script>
-            </div>
-        `);
-    } catch (err) {
-        res.status(500).send('Error generating QR code');
-    }
+// WhatsApp status endpoint
+app.get('/api/whatsapp-status', (req, res) => {
+    res.json({ ready: waReady });
 });
 
 // ============================================
@@ -324,126 +262,9 @@ app.post('/api/settings', async (req, res) => {
 });
 
 // ============================================
-// WHATSAPP OTP
+// WHATSAPP OTP (Meta Cloud API — no QR needed)
 // ============================================
 const otpStore = {};  // phone -> { otp, expiresAt }
-let waReady = false;
-let latestQR = null;
-let whatsappSessionStore = null;
-
-const waClient = new Client({
-    authStrategy: new LocalAuth({
-        clientId: 'smartparkk-whatsapp',
-        dataPath: './.wwebjs_auth'
-    }),
-    puppeteer: {
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--disable-gpu'
-        ],
-        headless: true,
-        executablePath: (process.env.PUPPETEER_EXECUTABLE_PATH && process.env.PUPPETEER_EXECUTABLE_PATH.trim() !== '')
-            ? process.env.PUPPETEER_EXECUTABLE_PATH
-            : undefined
-    }
-});
-
-waClient.on('authenticated', async (session) => {
-    console.log('  ✓  WhatsApp authenticated. Saving session to database...');
-    if (whatsappSessionStore) {
-        await whatsappSessionStore.write(session);
-    }
-});
-
-waClient.on('qr', (qr) => {
-    latestQR = qr;
-    console.log('\n  [WhatsApp] Scan this QR code with your WhatsApp:');
-    console.log('  (Open WhatsApp → Linked Devices → Link a Device)');
-    console.log('  👉 OR OPEN IN BROWSER: ' + (process.env.RAILWAY_STATIC_URL || 'https://' + process.env.RAILWAY_PUBLIC_DOMAIN || 'your-url') + '/api/qr');
-    console.log('  --------------------------------------------------\n');
-    qrcode.generate(qr, { small: true });
-});
-
-waClient.on('ready', () => {
-    waReady = true;
-    latestQR = null;
-    console.log('\n  ✓  WhatsApp connected! OTPs will be sent via WhatsApp.\n');
-});
-
-waClient.on('auth_failure', (msg) => {
-    console.error('  ✗  WhatsApp auth failed:', msg);
-});
-
-waClient.on('disconnected', () => {
-    waReady = false;
-    console.warn('  ⚠  WhatsApp disconnected. Will try to restore session...');
-});
-
-// ── WhatsApp inbound message handler (EXTEND replies) ───────────────────────
-waClient.on('message', async (msg) => {
-    const text = msg.body.trim().toUpperCase();
-    const senderPhone = msg.from.replace('@c.us', '').slice(-10);
-
-    const extendMatch = text.match(/^EXTEND\s+(\d+)$/);
-    if (!extendMatch) return; // Not an EXTEND command — ignore
-
-    const additionalHours = parseInt(extendMatch[1]);
-    if (additionalHours < 1 || additionalHours > 5) {
-        await msg.reply('❌ Please reply with EXTEND 1, EXTEND 2, or EXTEND 3 to add hours.');
-        return;
-    }
-
-    // Find active visitor
-    const { data: visitors, error } = await supabase
-        .from('visitors')
-        .select('*')
-        .is('exit_time', null)
-        .order('entry_time', { ascending: false });
-
-    if (error || !visitors) {
-        await msg.reply('❌ Sorry, could not process. Please contact gate staff.');
-        return;
-    }
-
-    const visitor = visitors.find(v =>
-        v.phone && v.phone.replace(/\D/g, '').slice(-10) === senderPhone
-    );
-
-    if (!visitor) {
-        await msg.reply('❌ No active parking session found for your number.');
-        return;
-    }
-
-    const newEstimatedHours = (visitor.estimated_hours || 4) + additionalHours;
-    const additionalCharge = (additionalHours * (visitor.rate_per_hour || 5)).toFixed(2);
-    const newEndTime = new Date(new Date(visitor.entry_time).getTime() + newEstimatedHours * 3600000);
-    const endTimeStr = newEndTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-    const { error: updateErr } = await supabase
-        .from('visitors')
-        .update({ estimated_hours: newEstimatedHours, extension_notified_at: null })
-        .eq('id', visitor.id);
-
-    if (updateErr) {
-        await msg.reply('❌ Could not update parking. Please contact gate staff.');
-        return;
-    }
-
-    console.log(`[EXTEND-WA] ${visitor.name} +${additionalHours}h → ${newEstimatedHours}h total`);
-
-    await msg.reply(
-        `✅ *Parking Extended!*\n\n` +
-        `Added *${additionalHours} hour${additionalHours > 1 ? 's' : ''}* to your session.\n\n` +
-        `📅 New estimated end: *${endTimeStr}*\n` +
-        `💰 Extra charge: *₹${additionalCharge}*\n\n` +
-        `You'll get another reminder 30 min before your new end time.\n` +
-        `🚗 ${visitor.license_plate}`
-    );
-});
 
 function generateOTP() {
     return Math.floor(1000 + Math.random() * 9000).toString();
@@ -457,45 +278,35 @@ app.post('/api/send-otp', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid phone number' });
     }
 
+    if (!waReady) {
+        return res.status(503).json({
+            success: false,
+            message: 'WhatsApp is not configured. Please contact the gate admin.'
+        });
+    }
+
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
     const otp = generateOTP();
     otpStore[cleanPhone] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 };
 
-    if (waReady) {
-        try {
-            // Smart phone formatting: 
-            // If 10 digits, assume India (+91). If more, use as is (assuming country code provided).
-            const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-            const chatId = `${fullPhone}@c.us`;
+    try {
+        await sendWhatsAppMessage(cleanPhone,
+            `🔐 *SmartParkk OTP*\n\nYour OTP is: *${otp}*\n\n💡 *Parking Charges:*\nIf you exceed your parking duration, a ₹50 fine will be applied.\n\n_Expires in 5 minutes. Do not share this._`
+        );
 
-            await waClient.sendMessage(chatId,
-                `🔐 *SmartParkk OTP*\n\nYour OTP is: *${otp}*\n\n💡 *Parking Charges:*\nIf you exceed your parking duration, a ₹50 fine will be applied.\n\n_Expires in 5 minutes. Do not share this._`);
+        console.log(`[WhatsApp OTP] Sent ${otp} → 91${cleanPhone}`);
+        return res.json({ success: true, message: 'OTP sent to your WhatsApp!' });
 
-            console.log(`[WhatsApp OTP] Sent ${otp} → ${fullPhone}`);
-            return res.json({ success: true, message: 'OTP sent to your WhatsApp!' });
-        } catch (err) {
-            console.error('[WhatsApp Error]', err.message);
-            if (err.message.includes('detached Frame') || err.message.includes('Target closed')) {
-                waReady = false;
-                console.log('⚠ Restoring WhatsApp client due to browser frame disconnect...');
-                try {
-                    await waClient.destroy();
-                } catch (e) { }
-                waClient.initialize();
-            }
-            // Fall through to on-screen fallback
-        }
+    } catch (err) {
+        console.error('[WhatsApp OTP] Send failed:', err.response?.data || err.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to send OTP via WhatsApp. Please try again.'
+        });
     }
-
-    // WhatsApp not connected yet — show on screen
-    console.log(`[OTP] ${otp} for ${cleanPhone} — WhatsApp not ready, showing on screen.`);
-    return res.json({
-        success: true,
-        demo: true,
-        otp,
-        message: waReady ? 'WhatsApp send failed. OTP shown below.' : 'WhatsApp not connected. OTP shown below.'
-    });
 });
+
+
 
 // POST /api/verify-otp
 app.post('/api/verify-otp', (req, res) => {
@@ -589,6 +400,47 @@ app.post('/api/residents/update', async (req, res) => {
     res.json({ success: true, resident: data[0] });
 });
 
+// Delete a resident account (requires password confirmation)
+app.delete('/api/residents/delete', async (req, res) => {
+    const { flatInput, password } = req.body;
+    if (!flatInput || !password) {
+        return res.status(400).json({ success: false, message: 'flatInput and password are required' });
+    }
+
+    try {
+        // Verify password first
+        const { data: resident, error: fetchErr } = await supabase
+            .from('residents')
+            .select('id, password')
+            .eq('flat_input', flatInput)
+            .single();
+
+        if (fetchErr || !resident) {
+            return res.status(404).json({ success: false, message: 'Account not found.' });
+        }
+
+        if (resident.password !== password) {
+            return res.status(401).json({ success: false, message: 'Incorrect password.' });
+        }
+
+        // Delete blocked_visitors entries for this resident
+        await supabase.from('blocked_visitors').delete().eq('resident_flat_id', flatInput);
+
+        // Delete the resident
+        const { error: deleteErr } = await supabase
+            .from('residents')
+            .delete()
+            .eq('flat_input', flatInput);
+
+        if (deleteErr) return res.status(500).json({ success: false, message: deleteErr.message });
+
+        console.log(`[ACCOUNT] Resident ${flatInput} deleted their account.`);
+        res.json({ success: true, message: 'Account deleted successfully.' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 app.get('/api/visitors', async (req, res) => {
     const { data, error } = await supabase.from('visitors').select('*');
     if (error) {
@@ -616,13 +468,16 @@ app.get('/api/visitors', async (req, res) => {
 app.post('/api/visitors', async (req, res) => {
     const b = req.body;
 
-    // Check if this plate is already in the system (no exit_time)
-    const { data: existingVisitor } = await supabase
+    // Check if another vehicle with this plate is already parked
+    let dupQuery = supabase
         .from('visitors')
         .select('id')
         .eq('license_plate', b.licensePlate)
-        .is('exit_time', null)
-        .limit(1);
+        .is('exit_time', null);
+
+    if (b.id) dupQuery = dupQuery.neq('id', b.id);
+
+    const { data: existingVisitor } = await dupQuery.limit(1);
 
     if (existingVisitor && existingVisitor.length > 0) {
         return res.status(400).json({
@@ -631,7 +486,7 @@ app.post('/api/visitors', async (req, res) => {
         });
     }
 
-    const { data, error } = await supabase.from('visitors').insert([{
+    const { data, error } = await supabase.from('visitors').upsert([{
         id: b.id || Date.now().toString(),
         name: b.name,
         phone: b.phone,
@@ -639,11 +494,11 @@ app.post('/api/visitors', async (req, res) => {
         visiting_flat: b.visitingFlat,
         entry_time: b.entryTime || new Date().toISOString(),
         exit_time: b.exitTime || null,
-        rate_per_hour: b.ratePerHour || 5,
+        rate_per_hour: (b.ratePerHour != null) ? b.ratePerHour : 5,
         total_charge: b.totalCharge || 0,
         estimated_hours: b.estimatedHours || 4,
         extension_notified_at: null
-    }]).select();
+    }], { onConflict: 'id' }).select();
 
     if (error) return res.status(500).json({ success: false, message: error.message });
 
@@ -711,7 +566,7 @@ app.post('/api/visitors/extend', async (req, res) => {
 
     const { error: updateErr } = await supabase
         .from('visitors')
-        .update({ estimated_hours: newEstimatedHours, extension_notified_at: null })
+        .update({ estimated_hours: newEstimatedHours, extension_notified_at: {} })
         .eq('id', visitor.id);
 
     if (updateErr) return res.status(500).json({ success: false, message: updateErr.message });
@@ -1169,43 +1024,20 @@ app.delete('/api/blocked-visitors', async (req, res) => {
 // START SERVER
 // ============================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
     console.log(`\n  SmartParkk Server running at:`);
     console.log(`  → Visitor:  http://localhost:${PORT}`);
     console.log(`  → Resident: http://localhost:${PORT}/resident`);
     console.log(`  → Admin:    http://localhost:${PORT}/admin`);
-    console.log(`  ✓  Database: Supabase (Cloud)\n`);
-
-    console.log('  ✓  WhatsApp OTP mode active.');
-
-    // Initialize session store after supabase is ready
-    if (supabase) {
-        whatsappSessionStore = new SupabaseSessionStore(supabase);
-        console.log('📱 WhatsApp session store initialized');
-
-        // Try to restore session from database
-        try {
-            const savedSession = await whatsappSessionStore.read();
-            if (savedSession) {
-                console.log('  ✓  WhatsApp session found in database, restoring...');
-            } else {
-                console.log('  ➤  No saved session. Scan the QR code when it appears.\n');
-            }
-        } catch (e) {
-            console.log('  ➤  No saved session. Scan the QR code when it appears.\n');
-        }
-    } else {
-        console.log('  ➤  No Supabase connection. Using local session only.\n');
-    }
-
-    waClient.initialize();
+    console.log(`  ✓  Database: Supabase (Cloud)`);
+    console.log(`  ${waReady ? '✓' : '⚠'}  WhatsApp Cloud API: ${waReady ? 'Active' : 'Not configured (set WHATSAPP_TOKEN + WHATSAPP_PHONE_NUMBER_ID)'}\n`);
 });
 
 // ============================================
 // PARKING EXPIRY NOTIFICATION JOB
 // ============================================
 async function checkParkingExpiryNotifications() {
-    if (!waReady) return; // Only run when WhatsApp is connected
+    if (!waReady) return;
 
     try {
         const { data: visitors, error } = await supabase
@@ -1216,7 +1048,8 @@ async function checkParkingExpiryNotifications() {
         if (error || !visitors || visitors.length === 0) return;
 
         const now = Date.now();
-        const TEN_MIN_MS = 10 * 60 * 1000;
+        const THIRTY_MIN_MS = 30 * 60 * 1000;
+        const FIVE_MIN_MS = 5 * 60 * 1000;
         const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
         for (const visitor of visitors) {
@@ -1224,54 +1057,75 @@ async function checkParkingExpiryNotifications() {
 
             const entryMs = new Date(visitor.entry_time).getTime();
             const ageMs = now - entryMs;
-            if (ageMs > ONE_DAY_MS) continue; // Stale record
+            if (ageMs > ONE_DAY_MS) continue; // Stale
 
             const estimatedHours = visitor.estimated_hours || 4;
             const estimatedEndMs = entryMs + estimatedHours * 3600000;
             const timeLeft = estimatedEndMs - now;
 
-            // Only notify in the 10-minute warning window
-            if (timeLeft > TEN_MIN_MS || timeLeft < 0) continue;
-
-            // Skip if already notified for this estimated end time
-            if (visitor.extension_notified_at) {
-                // Allow re-notify only if they extended (new end is >30min beyond last notif)
-                const notifMs = new Date(visitor.extension_notified_at).getTime();
-                const newEnd = entryMs + (visitor.estimated_hours * 3600000);
-                if (newEnd - notifMs <= TEN_MIN_MS) continue; // Not extended yet
+            // Define stages
+            let stage = null;
+            if (timeLeft <= 0) {
+                stage = 'expired';
+            } else if (timeLeft <= FIVE_MIN_MS) {
+                stage = 'urgent';
+            } else if (timeLeft <= THIRTY_MIN_MS) {
+                stage = 'warning';
             }
+
+            if (!stage) continue;
+
+            // Check tracker for this specific stage and estimated_hours
+            const lastNotif = visitor.extension_notified_at ? JSON.parse(visitor.extension_notified_at) : {};
+            const stageKey = `${stage}_${estimatedHours}`;
+
+            if (lastNotif[stageKey]) continue; // Already sent this stage for this duration
 
             const cleanPhone = visitor.phone.replace(/\D/g, '').slice(-10);
             const chatId = `91${cleanPhone}@c.us`;
-            const minutesLeft = Math.max(1, Math.round(timeLeft / 60000));
+            const minutesLeft = Math.max(0, Math.round(timeLeft / 60000));
             const currentCharge = ((ageMs / 3600000) * (visitor.rate_per_hour || 5)).toFixed(2);
+            const rate = visitor.rate_per_hour || 5;
 
-            const message =
-                `⏰ *SmartParkk – Parking Reminder*\n\n` +
-                `Hi ${visitor.name}! Your estimated parking time ends in *${minutesLeft} minutes*.\n\n` +
-                `💰 Current charge: *₹${currentCharge}*\n\n` +
-                `🔄 *Want to extend? Reply with:*\n` +
-                `• *EXTEND 1* → +1 hour (₹${visitor.rate_per_hour || 5})\n` +
-                `• *EXTEND 2* → +2 hours (₹${(visitor.rate_per_hour || 5) * 2})\n` +
-                `• *EXTEND 3* → +3 hours (₹${(visitor.rate_per_hour || 5) * 3})\n\n` +
-                `⚠️ *Important:* If you stay beyond your estimated time, a *₹50 fine* will be added to your charges!\n\n` +
-                `If you are leaving soon, you can just ignore this message.\n\n` +
-                `🚗 Plate: ${visitor.license_plate}`;
+            let message = '';
+            if (stage === 'warning' || stage === 'urgent') {
+                const timeStr = stage === 'warning' ? `*${minutesLeft} minutes*` : `ONLY *${minutesLeft} minutes*`;
+                message =
+                    `⏰ *SmartParkk – Parking Reminder*\n\n` +
+                    `Hi ${visitor.name}! Your estimated parking duration ends in ${timeStr}.\n\n` +
+                    `💰 Current base charge: *₹${currentCharge}*\n\n` +
+                    `🔄 *Want to avoid a fine? Reply with:*\n` +
+                    `• *EXTEND 1* → +1 hour (₹${rate})\n` +
+                    `• *EXTEND 2* → +2 hours (₹${rate * 2})\n\n` +
+                    `⚠️ *Fine Warning:* If you don't extend or leave in time, a *₹50 fine* will be added automatically.\n\n` +
+                    `🚗 Plate: ${visitor.license_plate}`;
+            } else if (stage === 'expired') {
+                message =
+                    `🚨 *SmartParkk – Parking EXPIRED*\n\n` +
+                    `Hi ${visitor.name}, your estimated duration of ${estimatedHours}h has completed.\n\n` +
+                    `⚠️ *Fine Applied:* A ₹50 fine has been added to your session as per policy.\n\n` +
+                    `✅ *You can still extend to remove the fine!* Reply with:\n` +
+                    `• *EXTEND 1* → +1 hour and *CANCEL FINE*\n\n` +
+                    `If you are at the gate, please proceed to exit.\n` +
+                    `🚗 Plate: ${visitor.license_plate}`;
+            }
 
             try {
-                await waClient.sendMessage(chatId, message);
-                console.log(`[EXPIRY NOTIF] Sent to +91${cleanPhone} (${visitor.name}, ${minutesLeft}min left)`);
+                await sendWhatsAppMessage(cleanPhone, message);
+                console.log(`[EXPIRY NOTIF] Stage: ${stage} sent to +91${cleanPhone} (${visitor.name})`);
 
+                // Update tracker
+                const updatedTracker = { ...lastNotif, [stageKey]: true, last_sent_at: new Date().toISOString() };
                 await supabase
                     .from('visitors')
-                    .update({ extension_notified_at: new Date().toISOString() })
+                    .update({ extension_notified_at: JSON.stringify(updatedTracker) })
                     .eq('id', visitor.id);
             } catch (sendErr) {
-                console.error(`[EXPIRY NOTIF] Failed for ${cleanPhone}:`, sendErr.message);
+                console.error(`[EXPIRY NOTIF] Error for ${cleanPhone}:`, sendErr.response?.data || sendErr.message);
             }
         }
     } catch (err) {
-        console.error('[EXPIRY CHECK] Error:', err.message);
+        console.error('[EXPIRY CHECK] Global Error:', err.message);
     }
 }
 

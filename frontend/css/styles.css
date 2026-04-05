@@ -28,8 +28,9 @@ body {
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     background: radial-gradient(circle at top right, #1e293b, #0f172a);
+    overflow-x: hidden;
 }
 
 .app-container {
@@ -38,6 +39,10 @@ body {
     padding: 20px;
     position: relative;
     overflow: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .screen {
@@ -664,7 +669,7 @@ input:focus {
     transform: scale(1.15);
 }
 
-/* Wheelchair button ─ cyan/teal accent */
+/* Accessibility / Wheelchair button ─ cyan/teal accent */
 #btn-accessibility:hover {
     border-color: var(--highlight);
     color: var(--highlight);
@@ -676,6 +681,28 @@ input:focus {
 
 #btn-accessibility:hover svg {
     transform: scale(1.15);
+}
+
+/* Normal Spots button ─ emerald/green accent */
+#btn-normal-spots:hover {
+    border-color: var(--success);
+    color: var(--success);
+    background: rgba(16, 185, 129, 0.12);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18),
+        0 6px 20px rgba(16, 185, 129, 0.2);
+    transform: translateY(-3px);
+}
+
+#btn-normal-spots:hover svg {
+    transform: scale(1.15);
+}
+
+/* Active states for both buttons */
+#btn-normal-spots.active {
+    border-color: var(--success);
+    color: var(--success);
+    background: rgba(16, 185, 129, 0.15);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
 }
 
 /* Active / toggled state for the accessibility button */
@@ -1402,4 +1429,268 @@ body.a11y .icon-btn svg {
 .visitor-lot-wrapper.spot-required-error {
     animation: errorPulse 0.7s ease 0s 3 both;
     border-radius: 10px;
+}
+
+/* =============================================
+   RESPONSIVE MEDIA QUERIES
+   ============================================= */
+
+/* --- Large screens (tablets, desktops) --- */
+@media (min-width: 600px) {
+    body {
+        align-items: center;
+        padding: 20px 0;
+    }
+
+    .app-container {
+        min-height: unset;
+        justify-content: unset;
+    }
+
+    .card {
+        padding: 36px;
+    }
+
+    .pm-modal {
+        max-height: 80vh;
+    }
+}
+
+/* --- Standard mobile (≤480px) — baseline but with safe padding --- */
+@media (max-width: 480px) {
+    body {
+        align-items: flex-start;
+    }
+
+    .app-container {
+        padding: 16px;
+        max-width: 100%;
+    }
+
+    .card {
+        padding: 24px 20px;
+        border-radius: 20px;
+    }
+
+    .header h1 {
+        font-size: 24px;
+    }
+
+    .header p {
+        font-size: 14px;
+    }
+
+    .btn {
+        padding: 14px;
+        font-size: 15px;
+    }
+
+    input {
+        padding: 12px 14px;
+        font-size: 15px;
+    }
+
+    .otp-input {
+        width: 48px;
+        height: 56px;
+        font-size: 20px;
+    }
+
+    .otp-inputs {
+        gap: 8px;
+    }
+
+    .time {
+        font-size: 40px;
+    }
+
+    .chip {
+        min-width: 44px;
+        padding: 8px 4px;
+        font-size: 12px;
+    }
+
+    .pm-overlay {
+        padding: 0 12px 16px;
+    }
+
+    .pm-modal {
+        border-radius: 20px 20px 16px 16px;
+        max-height: 88vh;
+    }
+
+    .pm-grid {
+        grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+        gap: 6px;
+        padding: 8px 14px 14px;
+    }
+
+    .pm-header {
+        padding: 16px 16px 12px;
+    }
+
+    .pm-legend {
+        padding: 8px 14px;
+        gap: 12px;
+    }
+
+    .pm-road {
+        margin: 4px 14px 0;
+    }
+
+    .pm-selection-banner {
+        margin: 0 14px 12px;
+    }
+
+    .spots-banner-inner {
+        padding: 6px 14px 6px 10px;
+        font-size: 13px;
+    }
+
+    .spots-count {
+        font-size: 16px;
+    }
+
+    .top-bar {
+        margin-bottom: 10px;
+    }
+
+    .parking-details,
+    .receipt-details {
+        padding: 16px;
+    }
+
+    .duration-chips {
+        gap: 6px;
+    }
+
+    .visitor-lot-section {
+        padding: 12px 12px;
+    }
+}
+
+/* --- Small phones (≤360px) --- */
+@media (max-width: 360px) {
+    .app-container {
+        padding: 12px;
+    }
+
+    .card {
+        padding: 20px 16px;
+        border-radius: 16px;
+    }
+
+    .header h1 {
+        font-size: 21px;
+    }
+
+    .header {
+        margin-bottom: 20px;
+    }
+
+    .otp-input {
+        width: 42px;
+        height: 50px;
+        font-size: 18px;
+    }
+
+    .otp-inputs {
+        gap: 6px;
+    }
+
+    .time {
+        font-size: 34px;
+    }
+
+    .chip {
+        min-width: 36px;
+        padding: 7px 3px;
+        font-size: 11px;
+        border-radius: 8px;
+    }
+
+    .btn {
+        padding: 13px;
+        font-size: 14px;
+    }
+
+    input {
+        padding: 11px 12px;
+        font-size: 14px;
+    }
+
+    .pm-grid {
+        grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+        gap: 5px;
+        padding: 6px 10px 12px;
+    }
+
+    .pm-spot-emoji {
+        font-size: 17px;
+    }
+
+    .icon-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+    }
+
+    .icon-btn svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    .spots-banner-inner {
+        padding: 5px 10px 5px 8px;
+        font-size: 12px;
+    }
+
+    .spots-count {
+        font-size: 14px;
+        min-width: 18px;
+    }
+}
+
+/* --- Landscape on small devices --- */
+@media (max-height: 500px) and (orientation: landscape) {
+    body {
+        align-items: flex-start;
+        padding: 10px 0;
+    }
+
+    .app-container {
+        min-height: unset;
+        padding: 10px 16px;
+    }
+
+    .card {
+        padding: 16px 20px;
+    }
+
+    .header {
+        margin-bottom: 16px;
+    }
+
+    .header h1 {
+        font-size: 20px;
+        margin-bottom: 4px;
+    }
+
+    .timer-container {
+        margin-bottom: 16px;
+    }
+
+    .time {
+        font-size: 36px;
+    }
+
+    .parking-details,
+    .receipt-details {
+        padding: 12px 14px;
+        margin-bottom: 14px;
+    }
+
+    .pm-modal {
+        max-height: 90vh;
+    }
 }

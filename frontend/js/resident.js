@@ -928,3 +928,105 @@ function showToast(message, type = 'success') {
         setTimeout(() => toast.remove(), 400);
     }, 3200);
 }
+
+// ============================================
+// DELETE ACCOUNT FEATURE
+// ============================================
+
+function openDeleteAccountModal() {
+    const overlay = document.getElementById('delete-account-overlay');
+    const pwdInput = document.getElementById('delete-account-password');
+    const errEl = document.getElementById('delete-account-error');
+
+    // Reset fields
+    if (pwdInput) pwdInput.value = '';
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+
+    overlay.style.display = 'flex';
+
+    // Re-trigger animation
+    const modal = document.getElementById('delete-account-modal');
+    if (modal) {
+        modal.style.animation = 'none';
+        requestAnimationFrame(() => { modal.style.animation = ''; });
+    }
+
+    // Focus password field after animation
+    setTimeout(() => { if (pwdInput) pwdInput.focus(); }, 150);
+}
+
+function closeDeleteAccountModal() {
+    document.getElementById('delete-account-overlay').style.display = 'none';
+}
+
+// Close on overlay click
+document.getElementById('delete-account-overlay')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeDeleteAccountModal();
+});
+
+async function confirmDeleteAccount() {
+    if (!currentResident) return;
+
+    const pwdInput = document.getElementById('delete-account-password');
+    const errEl = document.getElementById('delete-account-error');
+    const confirmBtn = document.getElementById('delete-account-confirm');
+
+    const password = pwdInput ? pwdInput.value.trim() : '';
+
+    if (!password) {
+        if (errEl) { errEl.textContent = 'Please enter your password.'; errEl.style.display = 'block'; }
+        if (pwdInput) pwdInput.focus();
+        return;
+    }
+
+    // Disable button + show loading state
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Deleting...';
+    if (errEl) { errEl.style.display = 'none'; }
+
+    try {
+        const res = await fetch('/api/residents/delete', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                flatInput: currentResident.flatInput,
+                password: password
+            })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            // Clear session
+            localStorage.removeItem('smartpark_resident_session');
+            currentResident = null;
+
+            // Clear intervals
+            if (window._approvalInterval) {
+                clearInterval(window._approvalInterval);
+                window._approvalInterval = null;
+            }
+
+            closeDeleteAccountModal();
+
+            // Show toast briefly, then go to login
+            showToast('✅ Account deleted successfully.', 'success');
+            setTimeout(() => showScreen('screen-login'), 1800);
+        } else {
+            if (errEl) {
+                errEl.textContent = data.message || 'Could not delete account. Try again.';
+                errEl.style.display = 'block';
+            }
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Delete Forever';
+        }
+    } catch (err) {
+        if (errEl) {
+            errEl.textContent = 'Server not reachable. Please try again.';
+            errEl.style.display = 'block';
+        }
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Delete Forever';
+        console.error(err);
+    }
+}
