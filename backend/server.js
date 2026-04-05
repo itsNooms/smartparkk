@@ -27,12 +27,10 @@ class SupabaseSessionStore {
                 .select('session_data')
                 .eq('key', this.sessionKey)
                 .single();
-
             if (error || !data) {
-                console.log('📱 No WhatsApp session found in database');
+                console.log('📱 No WhatsApp session found in database:', error ? error.message : 'No data');
                 return null;
             }
-
             console.log('📱 WhatsApp session loaded from database');
             return data.session_data;
         } catch (e) {
@@ -50,14 +48,15 @@ class SupabaseSessionStore {
                     session_data: data,
                     updated_at: new Date().toISOString()
                 });
-
             if (error) {
                 console.error('Error saving session to database:', error.message);
+                // Do not throw, just log and continue
             } else {
                 console.log('📱 WhatsApp session saved to database');
             }
         } catch (e) {
             console.error('Error saving session:', e.message);
+            // Do not throw, just log and continue
         }
     }
 }
@@ -136,6 +135,7 @@ app.use(express.json());
 // Middleware to check if Supabase is initialized
 app.use('/api', (req, res, next) => {
     if (!supabase) {
+        console.error('Supabase client not initialized. Check SUPABASE_URL and SUPABASE_ANON_KEY.');
         return res.status(503).json({
             success: false,
             message: 'Database connection not initialized. Please configure SUPABASE_URL and SUPABASE_ANON_KEY.'
@@ -519,8 +519,12 @@ app.post('/api/send-otp', async (req, res) => {
         }
     }
 
-    // WhatsApp not connected yet — show on screen
-    console.log(`[OTP] ${otp} for ${cleanPhone} — WhatsApp not ready, showing on screen.`);
+    // WhatsApp not connected yet or send failed — show on screen
+    if (!waReady) {
+        console.log(`[OTP] ${otp} for ${cleanPhone} — WhatsApp not ready, showing on screen.`);
+    } else {
+        console.log(`[OTP] ${otp} for ${cleanPhone} — WhatsApp send failed, showing on screen.`);
+    }
     return res.json({
         success: true,
         demo: true,
