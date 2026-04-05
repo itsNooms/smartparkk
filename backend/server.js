@@ -65,11 +65,15 @@ class SupabaseSessionStore {
 // ============================================
 // WEB PUSH CONFIG
 // ============================================
-webpush.setVapidDetails(
-    'mailto:admin@smartparkk.com',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-);
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+        'mailto:admin@smartparkk.com',
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+} else {
+    console.warn('[PUSH] VAPID keys missing. Push notifications disabled.');
+}
 
 const SUBSCRIPTIONS_FILE = path.join(__dirname, 'subscriptions.json');
 function getSubscriptions() {
