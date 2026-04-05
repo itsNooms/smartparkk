@@ -819,7 +819,7 @@ registerForm.addEventListener('submit', async (e) => {
     }
     // ─────────────────────────────────────────────
 
-    btn.textContent = 'Sending OTP via WhatsApp...';
+    btn.textContent = 'Sending OTP...';
 
     try {
         const res = await fetch('/api/send-otp', {
@@ -832,17 +832,19 @@ registerForm.addEventListener('submit', async (e) => {
         if (data.success) {
             displayPhone.textContent = `+91 ${visitorData.phone}`;
             const mockNote = document.querySelector('.mock-note');
-            if (mockNote) {
+            if (data.demo) {
+                mockNote.innerHTML = `⚠️ <b>WhatsApp not connected.</b><br>Using Demo OTP: <span style="font-size: 1.2em; color: var(--highlight);">${data.otp}</span>`;
+            } else {
                 mockNote.innerHTML = '✅ OTP sent to your WhatsApp!';
-                mockNote.style.display = 'block';
             }
+            mockNote.style.display = 'block';
             showScreen('screen-otp');
             setTimeout(() => otpInputs[0].focus(), 100);
         } else {
-            showRegisterError(data.message || 'Failed to send OTP. Please try again.');
+            alert(data.message || 'Failed to send OTP');
         }
     } catch (err) {
-        showRegisterError('Server not reachable. Make sure the server is running.');
+        alert('Server not reachable. Make sure server.js is running.');
         console.error(err);
     }
 
@@ -852,7 +854,6 @@ registerForm.addEventListener('submit', async (e) => {
 });
 
 // OTP Input Logic
-
 otpInputs.forEach((input, index) => {
     input.addEventListener('keyup', (e) => {
         if (e.key >= 0 && e.key <= 9) {

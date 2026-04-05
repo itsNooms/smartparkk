@@ -670,9 +670,7 @@ async function loadTableData() {
 
         dashboardEntries.forEach(entry => {
             const isCompleted = !!entry.exitTime;
-            // Don't count resident entries as occupying a visitor parking spot
-            const isRes = String(entry.id || '').startsWith('RES-') || entry.visitingFlat === 'RESIDENT' || entry.ratePerHour === 0;
-            if (!isCompleted && !isRes) activeCount++;
+            if (!isCompleted) activeCount++;
             logsBody.appendChild(createRowHTML(entry, isCompleted));
         });
 
@@ -706,10 +704,10 @@ async function loadTableData() {
 
             const entryTime = new Date(entry.entryTime).toLocaleString();
             const exitTime = entry.exitTime ? new Date(entry.exitTime).toLocaleString() : '-';
-            // Resident entries always have id starting with 'RES-' (set at scan time)
-            // Also catch legacy rows where visitingFlat was stored as 'RESIDENT'
-            const isResidentEntry = String(entry.id || '').startsWith('RES-') || entry.visitingFlat === 'RESIDENT';
-            const charge = isResidentEntry
+        // Resident entries always have id starting with 'RES-' (set at scan time)
+        // Also catch legacy rows where visitingFlat was stored as 'RESIDENT'
+        const isResidentEntry = String(entry.id || '').startsWith('RES-') || entry.visitingFlat === 'RESIDENT';
+        const charge = isResidentEntry
                 ? `<span style="color:#38bdf8; font-weight:700; font-size:12px; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.25); padding:3px 8px; border-radius:6px;">🏠 Resident</span>`
                 : entry.totalCharge ? `₹${entry.totalCharge.toFixed(2)}` : (isCompleted ? '₹0.00' : 'Accruing...');
 
@@ -1202,9 +1200,9 @@ async function renderParkingLot() {
         const ONE_DAY_MS = 24 * 60 * 60 * 1000;
         activeVisitors = (all || []).filter(v => {
             if (v.exitTime) return false;
-            // Exclude resident entries — they don't occupy numbered visitor spots.
-            // Three ways to detect: modern RES- id prefix, legacy RESIDENT sentinel, or rate=0 (after server fix)
-            if (String(v.id || '').startsWith('RES-') || v.visitingFlat === 'RESIDENT' || v.ratePerHour === 0) return false;
+            // Exclude resident entries from visitor parking spots
+            // Resident entries have id starting with 'RES-', or legacy visitingFlat='RESIDENT'
+            if (String(v.id || '').startsWith('RES-') || v.visitingFlat === 'RESIDENT') return false;
             const age = now - new Date(v.entryTime).getTime();
             return age <= ONE_DAY_MS;
         });
@@ -1549,7 +1547,7 @@ async function startDashboardScan() {
                 } catch (e) { }
 
                 if (matchedVisitor) {
-                    statusMsg.textContent = "✅ Validated!";
+                    statusMsg.textContent = "✅ Validated! Processing exit fees...";
                     const savedRate = localStorage.getItem('smartpark_rate_per_hour') || 5;
                     const entryMs = new Date(matchedVisitor.entryTime).getTime();
                     const diffMs = Math.max(Date.now() - entryMs, 0);
@@ -1562,7 +1560,12 @@ async function startDashboardScan() {
                         body: JSON.stringify({ id: matchedVisitor.id, exitTime: new Date().toISOString(), totalCharge: totalCharge })
                     });
 
-
+                    statusMsg.textContent = `🚗 Vehicle exit processed (Charge: ₹${totalCharge.toFixed(2)})`;
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        startDashboardScan();
+                    }, 6000);
+                    break;
                 }
 
                 // 1b. Check if plate belongs to a RESIDENT (free entry/exit)
