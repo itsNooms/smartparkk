@@ -383,9 +383,36 @@ waClient.on('auth_failure', (msg) => {
     console.error('  ✗  WhatsApp auth failed:', msg);
 });
 
-waClient.on('disconnected', () => {
+waClient.on('disconnected', async (reason) => {
     waReady = false;
-    console.warn('  ⚠  WhatsApp disconnected. Will try to restore session...');
+    latestQR = null;
+    console.warn('  ⚠  WhatsApp disconnected. Reason:', reason);
+    try {
+        console.log('  🗑️ Clearing .wwebjs_auth...');
+        fs.rmSync('./.wwebjs_auth', { recursive: true, force: true });
+    } catch (e) {
+        console.error('     Failed to clear folder:', e.message);
+    }
+    console.log('  🔄 Forcing server restart to generate new QR...');
+    process.exit(1); // Force hosting provider (Railway) to restart the container cleanly
+});
+
+// Admin endpoint to manually force a WhatsApp reset if it gets stuck
+app.get('/api/wa/reset', async (req, res) => {
+    res.send(`
+        <div style="font-family: sans-serif; text-align: center; margin-top: 50px;">
+            <h2 style="color: #ef4444;">Resetting WhatsApp Server...</h2>
+            <p>The system is clearing cached sessions and restarting.</p>
+            <p><strong>Please wait 10 seconds, then <a href="/api/qr">click here to get your new QR code</a>.</strong></p>
+        </div>
+    `);
+    
+    // Close client and exit after responding
+    setTimeout(async () => {
+        try { await waClient.destroy(); } catch(e) {}
+        try { fs.rmSync('./.wwebjs_auth', { recursive: true, force: true }); } catch(e) {}
+        process.exit(1);
+    }, 1000);
 });
 
 // ── WhatsApp inbound message handler (EXTEND replies) ───────────────────────
