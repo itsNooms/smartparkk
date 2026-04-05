@@ -367,7 +367,8 @@ waClient.on('qr', (qr) => {
     latestQR = qr;
     console.log('\n  [WhatsApp] Scan this QR code with your WhatsApp:');
     console.log('  (Open WhatsApp → Linked Devices → Link a Device)');
-    console.log('  👉 OR OPEN IN BROWSER: ' + (process.env.RAILWAY_STATIC_URL || 'https://' + process.env.RAILWAY_PUBLIC_DOMAIN || 'your-url') + '/api/qr');
+    const publicUrl = process.env.RAILWAY_STATIC_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? 'https://' + process.env.RAILWAY_PUBLIC_DOMAIN : null) || 'http://localhost:' + PORT;
+    console.log('  👉 OR OPEN IN BROWSER: ' + publicUrl + '/api/qr');
     console.log('  --------------------------------------------------\n');
     qrcode.generate(qr, { small: true });
 });
@@ -1300,8 +1301,9 @@ async function checkParkingExpiryNotifications() {
             const cleanPhone = visitor.phone.replace(/\D/g, '').slice(-10);
             const chatId = `91${cleanPhone}@c.us`;
             const minutesLeft = Math.max(0, Math.round(timeLeft / 60000));
-            const currentCharge = ((ageMs / 3600000) * (visitor.rate_per_hour || 5)).toFixed(2);
-            const rate = visitor.rate_per_hour || 5;
+            const vRate = (visitor.rate_per_hour != null) ? visitor.rate_per_hour : 5;
+            const currentCharge = ((ageMs / 3600000) * vRate).toFixed(2);
+            const rate = vRate;
 
             let message = '';
             if (stage === 'warning' || stage === 'urgent') {

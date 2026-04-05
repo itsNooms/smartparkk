@@ -706,7 +706,7 @@ async function loadTableData() {
             const exitTime = entry.exitTime ? new Date(entry.exitTime).toLocaleString() : '-';
         // Resident entries always have id starting with 'RES-' (set at scan time)
         // Also catch legacy rows where visitingFlat was stored as 'RESIDENT'
-        const isResidentEntry = String(entry.id || '').startsWith('RES-') || entry.visitingFlat === 'RESIDENT';
+        const isResidentEntry = String(entry.id || '').startsWith('RES-') || entry.visitingFlat === 'RESIDENT' || entry.ratePerHour === 0;
         const charge = isResidentEntry
                 ? `<span style="color:#38bdf8; font-weight:700; font-size:12px; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.25); padding:3px 8px; border-radius:6px;">🏠 Resident</span>`
                 : entry.totalCharge ? `₹${entry.totalCharge.toFixed(2)}` : (isCompleted ? '₹0.00' : 'Accruing...');
